@@ -157,3 +157,8 @@ Tests create an isolated PostgreSQL container with generated data and remove it 
 "The date has a counter that the database can increment only while it is below the limit. Capture and booking allocation commit together. A payment arriving for a full date is recorded and refunded, rather than silently accepted."
 
 Actual focused result: 200 paid attempts -> 50 fulfilled booking slots and 150 confirmed full refunds. Five new tests passed, including voucher limits and cancellation races. Public booking/callback routes are now protected and available; automatic processing needs configured gateway keys and worker activation. Earlier disabled-route notes describe historical step 3, not the current stage.
+
+## Explain assignment and private files
+“Only one short database transaction chooses a performer at a time. Both accepting and expiring an offer take that same lock and check the database clock. Unique indexes also stop a booking or performer having two active offers.”
+“Files live in a private container. Upload links last five minutes, allow creating one exact object and cannot overwrite it. Before a read link is issued we check the user and booking; approval freezes the saved object identity.”
+Demo: show the accept/expiry test, then the file test rejecting another user's read, a changed upload path and an overwrite. Azure was tested locally with Azurite, not deployed to a cloud account. File metadata validation is not malware scanning.

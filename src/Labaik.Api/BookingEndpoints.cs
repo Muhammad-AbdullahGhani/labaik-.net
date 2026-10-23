@@ -17,7 +17,7 @@ internal static class BookingEndpoints
         try { return await action(); }
         catch (PaymentConflictException error) { return Results.Conflict(new { reason = error.Message }); }
         catch (DbUpdateConcurrencyException) { return Results.Conflict(new { reason = "Booking was changed; reload and retry." }); }
-        catch (Exception error) when (error is PaymentDependencyException or NpgsqlException or TimeoutException or HttpRequestException)
+        catch (Exception error) when (error is PaymentDependencyException or NpgsqlException or TimeoutException or HttpRequestException or Application.Files.FileStoreUnavailableException or Azure.RequestFailedException)
         { return Results.StatusCode(503); }
     }
     public static void Map(WebApplication app)
@@ -29,7 +29,7 @@ internal static class BookingEndpoints
             var actor = await db.Users.SingleOrDefaultAsync(x => x.Id == Actor(context));
             var booking = await db.Bookings.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
             if (booking is null || actor is null || actor.Status != Domain.Users.UserStatus.Active) return Results.NotFound();
-            return booking.CustomerId == actor.Id || actor.Role is ActorRole.Admin or ActorRole.Supervisor or ActorRole.Accountant ? Results.Ok(booking) : Results.NotFound();
+            return booking.CustomerId == actor.Id || actor.Role is ActorRole.Admin or ActorRole.Supervisor or ActorRole.Accountant || await db.PerformerOffers.AnyAsync(x => x.BookingId == id && x.PerformerId == actor.Id && (x.Status == "Pending" || x.Status == "Accepted" || x.Status == "Finished")) ? Results.Ok(booking) : Results.NotFound();
         })).RequireAuthorization();
         app.MapPost("/bookings/{id:guid}/checkout", (Guid id, CheckoutRequest request, HttpContext context) => Run(async () =>
         {

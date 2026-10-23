@@ -63,6 +63,7 @@ if (provisionOnly)
 ServiceHost.MapHealthOnlyHost(app);
 AuthEndpoints.Map(app);
 BookingEndpoints.Map(app);
+OperationsEndpoints.Map(app);
 await app.RunAsync();
 
 // Named entry point keeps WebApplicationFactory types unambiguous when testing both executables.

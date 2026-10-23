@@ -400,6 +400,105 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.PerformerOffer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PerformerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id")
+                        .HasName("PK_PerformerOffers");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Offers_ActiveBooking")
+                        .HasFilter("\"Status\" IN ('Pending','Accepted')");
+
+                    b.HasIndex("PerformerId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Offers_ActivePerformer")
+                        .HasFilter("\"Status\" IN ('Pending','Accepted')");
+
+                    b.HasIndex("Status", "ExpiresAt")
+                        .HasDatabaseName("IX_Offers_Expiry");
+
+                    b.ToTable("PerformerOffers", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_Offers_Status", "\"Status\" IN ('Pending','Accepted','Expired','Cancelled','Finished')");
+                        });
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.StoredFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ETag")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("VersionId")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id")
+                        .HasName("PK_StoredFiles");
+
+                    b.HasIndex("ObjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Files_ObjectKey");
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("BookingId", "Kind")
+                        .HasDatabaseName("IX_Files_BookingKind");
+
+                    b.ToTable("StoredFiles", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_Files_Kind", "\"Kind\" IN ('Proof','Passport')");
+
+                            t.HasCheckConstraint("CK_Files_Size", "\"Size\" >= 0 AND \"Size\" <= 52428800");
+
+                            t.HasCheckConstraint("CK_Files_Status", "\"Status\" IN ('PendingUpload','Uploaded','Approved')");
+                        });
+                });
+
             modelBuilder.Entity("Labaik.Infrastructure.Payments.CapturedPayment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -507,7 +606,7 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_JobRuns_Counters", "\"Attempts\" >= 0 AND \"ClaimVersion\" >= 0");
 
-                            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox','Refund')");
+                            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox','Refund','Assign','ExpireOffer')");
 
                             t.HasCheckConstraint("CK_JobRuns_Lease", "\"Status\" <> 'Processing' OR (\"LeaseOwner\" IS NOT NULL AND \"LeaseUntil\" IS NOT NULL)");
 
@@ -792,6 +891,40 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("Id", "FamilyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("FK_RefreshTokens_ParentFamily");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.PerformerOffer", b =>
+                {
+                    b.HasOne("Labaik.Domain.Bookings.Booking", null)
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Offers_Bookings");
+
+                    b.HasOne("Labaik.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("PerformerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Offers_Users");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.StoredFile", b =>
+                {
+                    b.HasOne("Labaik.Domain.Bookings.Booking", null)
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Files_Booking");
+
+                    b.HasOne("Labaik.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Files_Owner");
                 });
 
             modelBuilder.Entity("Labaik.Infrastructure.Payments.CapturedPayment", b =>

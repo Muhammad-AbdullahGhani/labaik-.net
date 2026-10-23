@@ -11,10 +11,10 @@ public sealed class WorkPolicy
 public sealed record WorkClaim(Guid Id, Guid Owner, long Version, WorkKind Kind, Guid EntityId);
 public sealed class WorkQueue(AppDbContext db, WorkPolicy policy)
 {
-    public static void Enqueue(AppDbContext db, WorkKind kind, Guid entityId, DateTimeOffset now)
+    public static void Enqueue(AppDbContext db, WorkKind kind, Guid entityId, DateTimeOffset now, string? suffix = null)
     {
         // Immediate work is scheduled once per entity. Retries change AvailableAt, not the unique schedule key.
-        db.JobRuns.Add(new JobRun { Id = Guid.NewGuid(), JobName = $"{kind}:{entityId:N}", ScheduledFor = DateTimeOffset.UnixEpoch,
+        db.JobRuns.Add(new JobRun { Id = Guid.NewGuid(), JobName = $"{kind}:{entityId:N}" + (suffix is null ? "" : ":"+suffix), ScheduledFor = DateTimeOffset.UnixEpoch,
             Kind = kind, EntityId = entityId, AvailableAt = now });
     }
     public Task<DateTimeOffset> Now(CancellationToken ct) => db.Database.SqlQuery<DateTimeOffset>($"SELECT clock_timestamp() AS \"Value\"").SingleAsync(ct);

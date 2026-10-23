@@ -8,6 +8,7 @@ using Labaik.Domain.Pricing;
 using Labaik.Domain.Users;
 using Labaik.FakeGateway;
 using Labaik.Infrastructure.Payments;
+using Labaik.Infrastructure.Operations;
 using Labaik.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -128,7 +129,7 @@ public sealed class PaymentTestSystem : IAsyncDisposable
         services.AddSingleton(decorate?.Invoke(gatewayClient) ?? gatewayClient);
         services.AddSingleton<IPaymentEventPublisher>(new HttpPaymentEventPublisher(receiverClient));
         services.AddSingleton(new BookingPolicy()); services.AddScoped<BookingMoney>(); services.AddScoped<BookingService>();
-        services.AddScoped<PaymentCheckout>(); services.AddScoped<PaymentIngress>(); services.AddScoped<WorkQueue>(); services.AddScoped<PaymentPump>();
+        services.AddScoped<PaymentCheckout>(); services.AddScoped<PaymentIngress>(); services.AddScoped<AssignmentService>(); services.AddScoped<WorkQueue>(); services.AddScoped<PaymentPump>();
         Services = services.BuildServiceProvider();
         _ingressHost = new HostBuilder().ConfigureWebHost(web => web.UseTestServer().Configure(app => app.Run(async context =>
         {

@@ -40,7 +40,7 @@ public sealed class CoreSchemaTests(CoreDatabase database) : IClassFixture<CoreD
     public async Task Migration_applies_and_named_checks_reject_invalid_rows()
     {
         await using var db = database.CreateContext();
-        Assert.Equal(5, (await db.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(db.Database.GetMigrations().Count(), (await db.Database.GetAppliedMigrationsAsync()).Count());
         Assert.False(db.Database.HasPendingModelChanges());
         var (user, booking) = Seed();
         var voucher = new Voucher(Guid.NewGuid(), "V" + Guid.NewGuid().ToString("N"), VoucherKind.Percentage, null, 1000, 5, 2, DateTimeOffset.UtcNow.AddDays(1));

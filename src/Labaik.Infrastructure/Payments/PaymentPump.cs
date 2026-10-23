@@ -1,12 +1,13 @@
 using System.Text.Json;
 using Labaik.Application.Payments;
+using Labaik.Infrastructure.Operations;
 using Labaik.Domain.Bookings;
 using Labaik.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Labaik.Infrastructure.Payments;
 
-public sealed class PaymentPump(AppDbContext db, WorkQueue queue, IPaymentGateway gateway, WebhookCodec codec, IPaymentEventPublisher publisher, BookingMoney money)
+public sealed class PaymentPump(AppDbContext db, WorkQueue queue, IPaymentGateway gateway, WebhookCodec codec, IPaymentEventPublisher publisher, BookingMoney money, AssignmentService assignment)
 {
     public async Task<bool> RunOnceAsync(WorkKind? kind = null, CancellationToken ct = default)
     {
@@ -14,7 +15,8 @@ public sealed class PaymentPump(AppDbContext db, WorkQueue queue, IPaymentGatewa
         if (claim is null) return false;
         try
         {
-            if (claim.Kind == WorkKind.Refund) await RefundAsync(claim, ct);
+            if (claim.Kind is WorkKind.Assign or WorkKind.ExpireOffer) await assignment.HandleAsync(claim, ct);
+            else if (claim.Kind == WorkKind.Refund) await RefundAsync(claim, ct);
             else if (claim.Kind == WorkKind.Outbox) await PublishAsync(claim, ct);
             else await VerifyAsync(claim, ct);
         }

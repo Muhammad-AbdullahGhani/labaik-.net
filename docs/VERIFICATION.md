@@ -82,3 +82,6 @@ Core sale/capture/callback routes and Core payment-worker activation remain off 
 ## Step 4 (two-hour timebox)
 
 Focused `CapacityRefundTests`: 5 passed, 0 failed/skipped (21 s reported test duration). Real PostgreSQL tests proved 200 captures allocate exactly 50 slots and create/refund 150 overflow charges once; voucher reservations honor global/per-user limits under 200 concurrent attempts; cancellation races and lost refund responses recover. Release build passed with 0 warnings/errors before the focused run. Public booking/callback routes are now activated behind JWT/HMAC checks. Full regression deferred until completion of the timeboxed stages.
+
+## Step 5
+Release focused results: AssignmentTests 3 passed, 0 failed, 0 skipped (4 s). PrivateFileTests 1 passed, 0 failed, 0 skipped (7 s). Testcontainers used PostgreSQL 17 and Azurite 3.37.0. The initial missing Azurite image failed; the corrected pinned image passed. No live Azure deployment was tested.

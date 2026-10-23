@@ -114,3 +114,8 @@ Release build passed with 0 warnings/errors; 28 NEW payment integration cases pa
 ## Entry 008 - Approved two-hour completion through step 7 / step 4
 
 User approved the proposed two-hour timebox through steps 4-7, focused tests per stage and one final full regression run. This supersedes the older stop-before-step-4 instruction. Priorities: money/concurrency first, no optional UI/XLSX, plain-language demo notes and honest incomplete/live-provider limitations. Step 4 implements conditional capacity allocation, voucher-row-locked reservations/consumption/release, cancellation cleanup and durable idempotent full refunds. Public authenticated booking/create/checkout/cancel/read and signed callback routes are now mapped; workers remain a configurable activation setting. Five focused PostgreSQL tests passed, including 200 verified captures -> 50 paid / 150 refunded, 200-way global/per-user voucher limits, cancellation/capture race and lost-refund-response recovery. Build passed. Older route/migration assertions updated for activation; final regression reserved for the end. Next authorized work is lean assignment/files.
+
+## Entry 009 — Step 5 under the approved timebox
+Prompt: finish the remaining core steps in two hours, maintain easy demo wording and use focused tests before one final regression.
+Proposed/accepted: ordinary row mutex for round-robin and deadline decisions; Azure private blobs with create-only grants; no upload UI or transcoding. Implemented assignment, suspension, file authorization and approval.
+Validation: AssignmentTests 3 passed; PrivateFileTests 1 passed (real PostgreSQL and Azurite). Initial Azurite 3.35 pull failed; switched to available 3.37.0 and reran successfully. Cloud Azure remains unverified.

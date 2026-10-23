@@ -1,4 +1,5 @@
 using Labaik.Application.Payments;
+using Labaik.Infrastructure.Operations;
 using Labaik.Domain.Bookings;
 using Labaik.Domain.Vouchers;
 using Labaik.Infrastructure.Persistence;
@@ -62,6 +63,7 @@ public sealed class BookingMoney(AppDbContext db, BookingPolicy policy)
     public async Task CancelAsync(Guid bookingId, Guid actorId, CancellationToken ct = default)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await AssignmentLock.TakeAsync(db, ct);
         var booking = await db.Bookings.FromSqlInterpolated($"SELECT * FROM app.\"Bookings\" WHERE \"Id\"={bookingId} FOR UPDATE").SingleAsync(ct);
         var actor = await db.Users.SingleAsync(x => x.Id == actorId, ct);
         if (actor.Status != Domain.Users.UserStatus.Active) throw new PaymentConflictException("Inactive account.");
@@ -70,6 +72,7 @@ public sealed class BookingMoney(AppDbContext db, BookingPolicy policy)
         var result = booking.Cancel("CustomerOrSupervisorCancellation", actor.Role);
         if (!result.IsSuccess) throw new PaymentConflictException(result.Reason!);
         var now = await db.Database.SqlQuery<DateTimeOffset>($"SELECT clock_timestamp() AS \"Value\"").SingleAsync(ct);
+        await db.PerformerOffers.Where(x => x.BookingId == bookingId && (x.Status == "Pending" || x.Status == "Accepted")).ExecuteUpdateAsync(set => set.SetProperty(x => x.Status, "Cancelled"), ct);
         await ReleaseCapacityAsync(booking, now, ct); await ReleaseVoucherAsync(booking, now, ct);
         var capture = await db.CapturedPayments.SingleOrDefaultAsync(x => x.BookingId == bookingId, ct);
         if (capture is not null) await RequestRefundAsync(capture, "Cancelled", now, ct);

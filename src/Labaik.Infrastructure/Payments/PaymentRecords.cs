@@ -3,7 +3,7 @@ namespace Labaik.Infrastructure.Payments;
 public enum AttemptStatus { Creating, Pending, Unknown, Succeeded, Failed }
 public enum InboxStatus { Pending, Processed, Rejected }
 public enum WorkStatus { Pending, Processing, Completed, DeadLetter }
-public enum WorkKind { RecoverCheckout, Inbox, Outbox, Refund }
+public enum WorkKind { RecoverCheckout, Inbox, Outbox, Refund, Assign, ExpireOffer }
 public sealed class PaymentAttempt
 {
     public Guid Id { get; set; }

@@ -1,4 +1,6 @@
 using Labaik.Application.Payments;
+using Labaik.Application.Files;
+using Labaik.Infrastructure.Operations;
 using Labaik.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +16,8 @@ public static class PaymentHosting
         services.AddSingleton(new WorkPolicy());
         services.AddSingleton(new BookingPolicy { BaseMinor = config.GetValue("Booking:BaseMinor", 10000L), DailyLimit = config.GetValue("Booking:DailyLimit", 50),
             DateAddons = (config.GetSection("Booking:DateAddons").Get<Dictionary<string,long>>() ?? new()).ToDictionary(x => DateOnly.ParseExact(x.Key, "yyyy-MM-dd"), x => x.Value) });
+        services.AddScoped<AssignmentService>(); services.AddScoped<PrivateFileService>();
+        services.AddSingleton<IPrivateBlobStore>(_ => new AzurePrivateBlobStore(config["Storage:ConnectionString"] ?? throw new FileStoreUnavailableException(), config["Storage:Container"] ?? "private-evidence"));
         services.AddScoped<BookingMoney>(); services.AddScoped<BookingService>();
         services.AddSingleton(_ =>
         {

@@ -1,4 +1,5 @@
 using Labaik.Domain.Bookings;
+using Labaik.Infrastructure.Operations;
 using Labaik.Infrastructure.Payments;
 using Labaik.Infrastructure.Identity;
 using Labaik.Domain.Users;
@@ -21,6 +22,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<WebhookInbox> WebhookInbox => Set<WebhookInbox>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<RefundRequest> RefundRequests => Set<RefundRequest>();
+    public DbSet<PerformerOffer> PerformerOffers => Set<PerformerOffer>();
+    public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<JobRun> JobRuns => Set<JobRun>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +31,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         CoreModel.Configure(modelBuilder);
         AuthModel.Configure(modelBuilder);
         PaymentModel.Configure(modelBuilder);
+        OperationsModel.Configure(modelBuilder);
     }
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
