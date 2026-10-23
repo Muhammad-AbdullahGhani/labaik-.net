@@ -78,3 +78,7 @@ Accepted scope: verify/fix step 1 first, then implement only the requested domai
 ### Step 1 findings (verification in progress)
 
 The first working-Docker run exposed a real test setup bug: Testcontainers string/string resource mapping created a directory at the intended script filename. Replaced it with explicit FilePath source/destination mappings. Re-run passed: IntegrationTests 4, Gateway.Tests 3, failures 0, skipped 0; Domain.Tests has no cases before step 2a. Compose up --build --wait exited 0; all health URLs returned 200 Healthy; both containers ran as UID 1654; compose down exited 0. GitHub/GHCR and managed hosting remain unverified.
+
+## Entry 005 - Step 2a completed before identity
+
+User's follow-up requested step 2b identity while the step-1 verification was finishing. Asked for ordering because step 2a was still unimplemented; user explicitly answered to complete step 2a then move to step 2b. Implemented only domain core in this commit: state/role table, SAR arithmetic/configured pricing, voucher rules, five entities, named schema constraints and managed booking versions. Documented role decisions and application guards still needed, with Mermaid diagram. Tests: 744 domain, 7 integration, 3 gateway passed, 0 failed/skipped; Release build 0 warnings/errors. Corrected one constraint test that initially touched unrelated bookings, then reran full suite. Accepted: requested 2a scope and continuation into 2b; not accepted/inferred: any later business feature.

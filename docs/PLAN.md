@@ -1,6 +1,6 @@
 # Proposed implementation plan
 
-Status: step 1 authorized and implemented as a health-only skeleton; Docker-dependent verification and external deployment remain blocked as documented in VERIFICATION.md. Step 2 is not authorized. This document proposes behavior; it does not claim implementation or passing tests.
+Status: steps 1 and 2a verified locally; step 2b identity authorized next. External CI/registry/hosting execution remains unverified. This document proposes behavior; it does not claim implementation or passing tests.
 
 ## 1. Structure and transaction rules
 

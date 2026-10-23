@@ -1,1 +1,1 @@
-Domain tests are deliberately empty in step 1: no business rules are implemented yet. No placeholder passing assertion is counted as a test.
+Unit tests cover every state/role pair, SAR arithmetic/pricing, voucher limits and boundary rounding. No identity behavior is included in step 2a.

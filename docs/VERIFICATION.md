@@ -40,3 +40,7 @@ Passed!  - Failed:     0, Passed:     3, Skipped:     0, Total:     3, Duration:
 ```
 
 The failing test is Both_services_are_ready_only_while_real_PostgreSQL_is_reachable, with DockerUnavailableException and Docker Desktop unable to start. This remains a required failing test locally, not a silent skip. CI requires Linux Docker and runs it without a skip switch. Raw local TRX results and generated migration/vulnerability reports are in ignored artifacts/; CI uploads its own results. Follow DEPLOYMENT.md to clear the blocker and deploy manually later. The requested commit message describes the intended deliverable; it is not evidence of a public deployment.
+
+## Step 2a results
+
+`dotnet build --configuration Release`: exit 0, 0 warnings/errors. `dotnet test --configuration Release --logger "trx;LogFilePrefix=step2a-final" --results-directory artifacts/tests`: exit 0; Domain.Tests 744 passed, IntegrationTests 7 passed, Gateway.Tests 3 passed; 0 failed/skipped. PostgreSQL migration/checks and stale-version tests ran against real containers. Initial constraint test failure was due to updating unrelated rows; fixed by binding its own booking ID. No identity/refresh behavior exists in this commit.

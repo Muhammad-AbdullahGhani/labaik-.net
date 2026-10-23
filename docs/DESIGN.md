@@ -1,6 +1,6 @@
 # Design
 
-Status: step 1 implemented only; no step-2 authorization. Local build and HTTP smoke checks passed, but Docker-dependent verification and external deployment remain blocked. See [PLAN.md](PLAN.md) for the revised decisions and acceptance tests.
+Status: steps 1 and 2a implemented; step 2b identity is now authorized. Local build and HTTP smoke checks passed, but Docker-dependent verification and external deployment remain blocked. See [PLAN.md](PLAN.md) for the revised decisions and acceptance tests.
 
 ## Architecture
 
@@ -13,25 +13,25 @@ Proposed normal path below. Exceptional transitions, role matrix, and guards rem
 ```mermaid
 stateDiagram-v2
     [*] --> Draft
-    Draft --> PendingPayment
-    PendingPayment --> Paid
-    Paid --> Offered
-    Offered --> Accepted
-    Accepted --> InProgress
-    InProgress --> ProofSubmitted
-    ProofSubmitted --> Completed
-    Offered --> Paid: offer expires
-    Draft --> Cancelled
-    PendingPayment --> Cancelled
-    Paid --> Cancelled
-    Offered --> Cancelled
-    Accepted --> Cancelled
-    InProgress --> Disputed
-    ProofSubmitted --> Disputed
-    Completed --> Disputed
-    Disputed --> Completed: supervisor resolves
-    Disputed --> Cancelled: refund resolution
-    Cancelled --> Refunded: captured payment fully refunded
+    Draft --> PendingPayment: Customer or Admin
+    PendingPayment --> Paid: System verified capture
+    Paid --> Offered: System
+    Offered --> Accepted: assigned Performer
+    Accepted --> InProgress: assigned Performer
+    InProgress --> ProofSubmitted: assigned Performer
+    ProofSubmitted --> Completed: Supervisor or Admin
+    Offered --> Paid: System expiry
+    Draft --> Cancelled: Customer or Supervisor or Admin
+    PendingPayment --> Cancelled: Customer or Supervisor or Admin or System
+    Paid --> Cancelled: Customer or Supervisor or Admin
+    Offered --> Cancelled: Customer or Supervisor or Admin
+    Accepted --> Cancelled: Supervisor or Admin
+    InProgress --> Disputed: Customer or Performer or Supervisor or Admin
+    ProofSubmitted --> Disputed: Customer or Performer or Supervisor or Admin
+    Completed --> Disputed: Customer or Supervisor or Admin
+    Disputed --> Completed: Supervisor or Admin
+    Disputed --> Cancelled: Supervisor or Admin
+    Cancelled --> Refunded: System confirmed refund
 ```
 
 Payment, refund, offer, and payout states are separate from booking state. A late charge on a cancelled booking creates a refund request; it does not resurrect the booking. Cancelling a paid booking retains its payment ledger and requests a refund.
@@ -69,3 +69,13 @@ Actual checks: Release build passed with 0 warnings/errors; six HTTP smoke cases
 ## Step 1 re-verification
 
 With working Docker, corrected a Testcontainers file/directory mapping bug. Full tests passed (4 integration, 3 gateway); Compose built both images, completed explicit migrations, returned healthy on all four HTTP probes and ran both services non-root (UID 1654). Compose shutdown passed. Historical Docker-blocked results above are superseded locally; GitHub/GHCR and external hosting remain unverified. See VERIFICATION.md. User has authorized step 2a followed by step 2b, each in its own commit.
+
+## Step 2a - domain core implemented
+
+BookingStateMachine owns the explicit state/role table; unknown enums, self-transitions and all missing edges/roles return a failed RuleResult with a reason for a future API 409. Accountant has no booking transition privileges. Admin cannot manufacture Paid/Refunded or act as the performer. Booking state setters are private. Actor ownership, verified payment/refund evidence, assignment/deadline checks and transactional side effects remain application work; a role-table success alone is not sufficient authorization for those future operations. No business HTTP routes were added.
+
+Money is a nonnegative SAR long value with checked addition/subtraction. PricingPolicy snapshots server configuration; date add-ons, fixed clamps and exact floor-rounded basis points produce immutable quotes. Percentage multiplication uses quotient/remainder to avoid overflowing an otherwise valid long result. Zero-total checkout is rejected. Voucher eligibility uses an explicit time and usage snapshot; atomic redemption/capacity allocation is not implemented yet.
+
+BookingCore migration creates User, Booking, DailyCapacity, Voucher and VoucherRedemption with named checks/FKs/indexes. SQL numeric casts protect the total CHECK expression from bigint intermediate overflow; nullable discount shapes explicitly check IS NOT NULL because SQL UNKNOWN otherwise passes CHECK. EF versions increment on every tracked booking update while retaining the original token in WHERE; raw SQL/bulk writers must explicitly check/increment it. No generic audit or identity behavior was added.
+
+Validation: Release build 0 warnings/errors; full tests 744 domain + 7 integration + 3 gateway, all passed, zero skipped. Includes every state/role pair, monetary/rounding boundaries, voucher expiry/limits, real migration/constraint rejection and stale writes through synchronous/asynchronous saves. An initial test updated unrelated bookings; scoped that invalid write to its own row before rerunning successfully. User then authorized completing step 2b; it is the only next scope.
