@@ -64,3 +64,17 @@ Implemented that skeleton without business endpoints/entities or step-2 identity
 ### Real validation
 
 Release build passed with 0 warnings and 0 errors after resolving an initial EF runtime/design patch conflict. Full dotnet test exited 1: six HTTP cases passed, one required PostgreSQL container case failed at Docker startup, zero skipped; Domain.Tests has no tests yet. Vulnerability report found no known vulnerable direct/transitive packages. Compose config passed; compose up failed because Docker Desktop cannot start. EF generated both empty migrations and offline idempotent SQL scripts; API --migrate against an unreachable DB returned nonzero with sanitized JSON. Actions workflow validation passed with actionlint v1.7.12. No containers, schema isolation, migration execution on real PostgreSQL, GHCR push or external hosting were verified. See VERIFICATION.md. Do not proceed to step 2.
+
+## Entry 004 - Step 1 re-verification, then step 2a authorization
+
+### Prompt
+
+User reported working Docker and requested dotnet test --configuration Release, docker compose up --build --wait, then docker compose down; fix step 1, record actual results and commit chore: verify step 1 before continuing. Then authorize step 2a only: domain state machine/role table, SAR checked money/pricing, pure voucher rules, five EF entities with named constraints/migration and version concurrency tests. Explicitly exclude identity/refresh tokens; finish with feat: enforce booking and money invariants and stop.
+
+### Proposal and user decision
+
+Accepted scope: verify/fix step 1 first, then implement only the requested domain core. New schema includes User data but no login, token rotation or identity endpoints. Role and exceptional-transition choices will be documented and exhaustively tested. Authorization for later steps is not inferred.
+
+### Step 1 findings (verification in progress)
+
+The first working-Docker run exposed a real test setup bug: Testcontainers string/string resource mapping created a directory at the intended script filename. Replaced it with explicit FilePath source/destination mappings. Re-run passed: IntegrationTests 4, Gateway.Tests 3, failures 0, skipped 0; Domain.Tests has no cases before step 2a. Compose up --build --wait exited 0; all health URLs returned 200 Healthy; both containers ran as UID 1654; compose down exited 0. GitHub/GHCR and managed hosting remain unverified.

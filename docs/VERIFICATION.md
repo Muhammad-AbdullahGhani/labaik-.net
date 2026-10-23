@@ -1,3 +1,17 @@
+# Step 1 re-verification - working Docker
+
+Latest observed results supersede the historical blocked run below.
+
+- Initial test exposed a real resource-mapping bug: the string destination was interpreted as a directory. Fixed with explicit Testcontainers FilePath mappings.
+- `dotnet test --configuration Release`: exit 0; IntegrationTests 4 passed (including real PostgreSQL connectivity, schema isolation and repeatable migrations), Gateway.Tests 3 passed; no failures or skips. Domain.Tests intentionally empty at this point.
+- `docker compose up --build --wait`: exit 0; both migration tasks exited successfully and PostgreSQL/API/gateway became healthy.
+- Actual HTTP checks: ports 8080 and 8081 each returned 200 Healthy for /health/live and /health/ready with generated correlation IDs.
+- `docker compose exec -T api id -u` and gateway equivalent: both 1654 (non-root).
+- `docker compose down`: exit 0; services and network removed, data volume retained.
+- GitHub execution/GHCR push and managed hosting remain unverified; no paid hosting was provisioned.
+
+## Historical first run (Docker unavailable)
+
 # Step 1 verification ? 2026-10-23
 
 These are observed local results, not a deployment claim. SDK: 10.0.402. No step-2 business code exists.

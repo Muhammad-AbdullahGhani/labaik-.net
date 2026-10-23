@@ -1,4 +1,5 @@
 using System.Net;
+using DotNet.Testcontainers.Builders;
 using Labaik.FakeGateway;
 using Labaik.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
@@ -26,8 +27,9 @@ public sealed class PostgresReadinessTests
             .WithEnvironment("GATEWAY_DB_PASSWORD", gatewayPassword)
             .WithEnvironment("APP_MIGRATOR_PASSWORD", appMigratorPassword)
             .WithEnvironment("GATEWAY_MIGRATOR_PASSWORD", gatewayMigratorPassword)
-            .WithResourceMapping(Path.Combine(AppContext.BaseDirectory, "postgres-init.sh"),
-                "/docker-entrypoint-initdb.d/001-schemas.sh")
+            // The string/string overload treats the destination as a directory, even when it looks like a filename.
+            .WithResourceMapping(FilePath.Of(Path.Combine(AppContext.BaseDirectory, "postgres-init.sh")),
+                FilePath.Of("/docker-entrypoint-initdb.d/001-schemas.sh"))
             .Build();
         // Intentionally fail if Docker is unavailable: CI must never silently skip the database proof.
         await postgres.StartAsync();
