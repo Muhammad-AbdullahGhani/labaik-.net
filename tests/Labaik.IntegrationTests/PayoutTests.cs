@@ -94,6 +94,15 @@ public sealed class PayoutTests(PaymentDatabase database) : IClassFixture<Paymen
         await using(var db=database.App()) Assert.Null(await Payout(db).CreateAsync(data.Performer,_week,"disputed",data.Accountant));
     }
     [Fact]
+    public async Task Two_weekly_workers_create_one_batch_with_a_stable_schedule_key()
+    {
+        var data=await Seed();await Complete(data);await using var system=new PaymentTestSystem(database);
+        async Task Tick(){await using var db=database.App();await new OperationsScheduler(db,new WorkQueue(db,new WorkPolicy()),new WorkerIdentity()).TickAsync(default);}
+        await Task.WhenAll(Tick(),Tick());await Task.WhenAll(system.Pump(WorkKind.PayoutSweep),system.Pump(WorkKind.PayoutSweep));
+        await using var check=database.App();Assert.Single(await check.PayoutBatches.ToListAsync());Assert.Single(await check.PayoutItems.ToListAsync());
+        Assert.Equal(WorkStatus.Completed,(await check.JobRuns.SingleAsync(x=>x.Kind==WorkKind.PayoutSweep)).Status);
+    }
+    [Fact]
     public async Task Customer_cannot_create_or_export_or_confirm_payout()
     {
         var data=await Seed(); await Complete(data); await using var db=database.App(); var service=Payout(db);

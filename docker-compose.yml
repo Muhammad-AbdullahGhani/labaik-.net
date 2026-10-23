@@ -54,6 +54,11 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: "8080"
       Payments__GatewayUrl: http://fake-gateway:8080/
+      Payments__WorkersEnabled: "true"
+      Storage__ConnectionString: ${STORAGE_CONNECTION_STRING:-}
+      Storage__Container: ${STORAGE_CONTAINER:-private-evidence}
+      Notifications__EmailApiKey: ${EMAIL_API_KEY:-}
+      Notifications__EmailFrom: ${EMAIL_FROM:-}
       Gateway__ApiKey: ${GATEWAY_API_KEY:-}
       Payments__WebhookEncryptionKey: ${WEBHOOK_ENCRYPTION_KEY:-}
       Payments__WebhookSignatureKey: ${WEBHOOK_SIGNATURE_KEY:-}
@@ -82,7 +87,7 @@ services:
       Payments__WebhookSignatureKey: ${WEBHOOK_SIGNATURE_KEY:-}
       Gateway__ReturnUrl: http://localhost:8080/payments/return
       Gateway__WebhookUrl: http://api:8080/webhooks/gateway
-      Gateway__DispatchEnabled: "false"
+      Gateway__DispatchEnabled: "true"
       ConnectionStrings__Database: Host=postgres;Database=labaik;Username=labaik_gateway;Password=${GATEWAY_DB_PASSWORD:?Set GATEWAY_DB_PASSWORD};Timeout=2;Command Timeout=2
     ports:
       - "127.0.0.1:8081:8080"

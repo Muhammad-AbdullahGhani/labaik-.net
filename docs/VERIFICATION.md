@@ -88,3 +88,63 @@ Release focused results: AssignmentTests 3 passed, 0 failed, 0 skipped (4 s). Pr
 
 ## Step 6
 Release build: succeeded, 0 warnings, 0 errors. PayoutTests: 6 passed, 0 failed, 0 skipped (5 s). Covers 20 concurrent same/different-key batch requests, proof/role guards, repeat export, failed-claim recovery, terminal result race and dispute exclusion. Bank execution/format acceptance is not verified.
+
+
+## Step 7 / final regression (23 October 2026)
+
+Observed full command:
+
+```text
+dotnet test --configuration Release --logger "trx;LogFilePrefix=final" --results-directory artifacts/tests
+Passed! Failed: 0, Passed: 744, Skipped: 0, Total: 744 - Labaik.Domain.Tests (740 ms)
+Passed! Failed: 0, Passed:   3, Skipped: 0, Total:   3 - Labaik.Gateway.Tests (3 s)
+Passed! Failed: 0, Passed:  76, Skipped: 0, Total:  76 - Labaik.IntegrationTests (1 m 23 s)
+```
+
+Total: **823 passed, zero failed/skipped**. PostgreSQL and Azurite were real Testcontainers services; no in-memory database replacement. The full run includes all five financial/concurrency proofs plus identity and three NBomber 200-user scenarios. TRX artifacts are local ignored files, not evidence of a remote CI run.
+
+After that full run, a stale-notification fix, per-instance heartbeat test and migration-history correction were checked with the focused command (not a second full run):
+
+```text
+dotnet test tests/Labaik.IntegrationTests --configuration Release --filter "FullyQualifiedName~DeliveryOperationsTests|FullyQualifiedName~PayoutTests|FullyQualifiedName~CoreSchemaTests"
+Passed! Failed: 0, Passed: 15, Skipped: 0, Total: 15 (5 s)
+
+dotnet build --configuration Release --no-restore
+Build succeeded. 0 Warning(s), 0 Error(s). (7.14 s)
+```
+
+The targeted run proves the final fresh-database migrations/constraints, weekly payout worker and final delivery/heartbeat behavior. Do not add overlapping focused counts to the 823 full-regression count.
+
+Observed dependency scan:
+
+```text
+dotnet list Labaik.sln package --vulnerable --include-transitive --format json
+python scripts/check-vulnerabilities.py artifacts/vulnerabilities.json
+No known vulnerable packages reported, including transitive dependencies.
+```
+
+NBomber final full-run reports are copied into load/results. Each scenario reports 200 operations, 200 expected outcomes, zero unexpected failures. Expected voucher 409 conflicts count as correct responses: database assertions separately require 20 global or 2 per-user reservations. Capacity asserts 50 slots/200 captures/150 refund requests. These are correctness measurements through production HTTP TestServer endpoints, not a remote throughput benchmark; do not treat the reported nominal RPS as a production SLA.
+
+Docker upgrade verification caught a local migration-history problem: an earlier local image had applied DeliveryOperations before its ID was regenerated for a new job kind. The deployment stopped with exit 1 rather than starting the API on an inconsistent schema. Fixed by preserving the originally applied migration ID and adding a separate WeeklyPayoutJobs migration; the retained local database is used for the retry. NuGet also retried a prematurely ended package download. Dockerfiles now separate project/dependency layers from source and share a locked package cache.
+
+Final Compose retry/health/shutdown evidence follows. No live Firebase exchange/FCM, Azure cloud, Resend recipient delivery, bank transfer/CSV acceptance, public hosting, GHCR push or remote Actions run was performed. Local SDK contract tests/provider transport fakes do not establish live-provider acceptance.
+
+
+Final retained-database retry observed at 15:47 UTC:
+
+```text
+docker compose up --build --wait
+exit 0; postgres, api and fake-gateway Healthy; both migration tasks exited 0
+API /health/live 200 Healthy; /health/ready 200 Healthy
+Gateway /health/live 200 Healthy; /health/ready 200 Healthy
+GET /operations without a token: 401
+api id -u: 1654; fake-gateway id -u: 1654
+Applied: preserved DeliveryOperations + new WeeklyPayoutJobs
+Nightly Reconcile: Completed, zero mismatches on the empty local ledger
+Weekly PayoutSweep: Completed, no available earnings
+
+docker compose down
+exit 0; services stopped/removed, network removed; database volume retained
+```
+
+No production database was contacted. The successful upgrade used the existing local volume and real schema-owner/runtime separation. This is a local deployment check; cloud integrations and managed hosting remain unverified. The final source is covered by the explicit build and focused 15-test follow-up, while the recorded full 823-test run predates the two follow-up tests/fixes. CI will run the complete current suite after push.

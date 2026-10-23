@@ -19,6 +19,7 @@ public static class PaymentHosting
         services.AddScoped<AssignmentService>(); services.AddScoped<PrivateFileService>();
         services.AddSingleton(new PayoutPolicy { PerformerFeeMinor = config.GetValue("Payouts:PerformerFeeMinor", 7000L), Accounts = config.GetSection("Payouts:Accounts").Get<Dictionary<string,string>>() ?? new() });
         services.AddScoped<CompletionService>(); services.AddScoped<PayoutService>();
+        services.AddSingleton<WorkerIdentity>(); services.AddScoped<OperationsScheduler>();
         services.AddSingleton<IPrivateBlobStore>(_ => new AzurePrivateBlobStore(config["Storage:ConnectionString"] ?? throw new FileStoreUnavailableException(), config["Storage:Container"] ?? "private-evidence"));
         services.AddScoped<BookingMoney>(); services.AddScoped<BookingService>();
         services.AddSingleton(_ =>
@@ -33,15 +34,11 @@ public static class PaymentHosting
             client.DefaultRequestHeaders.Add("X-Gateway-Key", config["Gateway:ApiKey"] ?? throw new PaymentDependencyException());
             client.Timeout = TimeSpan.FromSeconds(3);
         });
-        services.AddHttpClient<IPaymentEventPublisher, HttpPaymentEventPublisher>(client =>
-        {
-            if (config["Payments:EventReceiverUrl"] is { Length: > 0 } url) client.BaseAddress = new Uri(url);
-            if (config["Payments:EventReceiverKey"] is { Length: > 0 } key) client.DefaultRequestHeaders.Add("X-Event-Receiver-Key", key);
-            client.Timeout = TimeSpan.FromSeconds(3);
-        });
+        services.AddHttpClient<INotificationTransport, NotificationTransport>(client => client.Timeout = TimeSpan.FromSeconds(5));
+        services.AddScoped<IPaymentEventPublisher, BookingEventPublisher>();
         services.AddScoped<PaymentCheckout>(); services.AddScoped<PaymentIngress>();
         services.AddScoped<WorkQueue>(); services.AddScoped<PaymentPump>();
-        // Deliberately do NOT map checkout/callback routes or start PaymentWorker until step 4's capacity/refunds exist.
+        // Worker activation is explicit so the migration runner never starts external delivery.
         return services;
     }
 }
@@ -52,11 +49,17 @@ public sealed class PaymentWorker(IServiceScopeFactory scopes, ILogger<PaymentWo
     {
         try
         {
+            var nextHeartbeat=DateTimeOffset.MinValue;
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
                     await using var scope = scopes.CreateAsyncScope();
+                    if(DateTimeOffset.UtcNow>=nextHeartbeat)
+                    {
+                        await scope.ServiceProvider.GetRequiredService<OperationsScheduler>().TickAsync(stoppingToken);
+                        nextHeartbeat=DateTimeOffset.UtcNow.AddSeconds(5);
+                    }
                     var ran = await scope.ServiceProvider.GetRequiredService<PaymentPump>().RunOnceAsync(ct: stoppingToken);
                     if (!ran) await Task.Delay(250, stoppingToken);
                 }

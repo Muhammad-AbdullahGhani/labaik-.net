@@ -25,7 +25,7 @@ public sealed class AssignmentTests(PaymentDatabase database) : IClassFixture<Pa
         await using (var db = database.App()) { db.Users.Add(performer); await db.SaveChangesAsync(); }
         var attempt = await system.Checkout(seed.BookingId, seed.OwnerId,"offer"); await system.Pay(attempt.CheckoutId!.Value); await system.Pump(WorkKind.RecoverCheckout);
         await using (var db = database.App()) { WorkQueue.Enqueue(db, WorkKind.Assign,seed.BookingId,DateTimeOffset.UtcNow); await db.SaveChangesAsync(); }
-        await system.Pump(WorkKind.Assign);
+        await database.DueAsync(WorkKind.Assign); await system.Pump(WorkKind.Assign);
         await using (var check=database.App())
         {
             var job=await check.JobRuns.SingleAsync(x=>x.Kind==WorkKind.Assign && x.EntityId==seed.BookingId);
@@ -59,7 +59,7 @@ public sealed class AssignmentTests(PaymentDatabase database) : IClassFixture<Pa
         await using var system = new PaymentTestSystem(database); var data = await Offer(system);
         var seed = await database.SeedAsync(); var attempt = await system.Checkout(seed.BookingId,seed.OwnerId,"second"); await system.Pay(attempt.CheckoutId!.Value); await database.DueAsync(WorkKind.RecoverCheckout); await system.Drain(WorkKind.RecoverCheckout);
         await using (var db = database.App()) { WorkQueue.Enqueue(db,WorkKind.Assign,seed.BookingId,DateTimeOffset.UtcNow); await db.SaveChangesAsync(); }
-        await Task.WhenAll(system.Pump(WorkKind.Assign),system.Pump(WorkKind.Assign));
+        await database.DueAsync(WorkKind.Assign); await Task.WhenAll(system.Pump(WorkKind.Assign),system.Pump(WorkKind.Assign));
         await using (var db = database.App()) Assert.Equal(1,await db.PerformerOffers.CountAsync(x=>x.Status=="Pending"));
         var supervisor = new User(Guid.NewGuid(),"assignment-test",Guid.NewGuid().ToString("N"),ActorRole.Supervisor,DateTimeOffset.UtcNow);
         await using (var db=database.App()) { db.Users.Add(supervisor); await db.SaveChangesAsync(); }

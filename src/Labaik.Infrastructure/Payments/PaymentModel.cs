@@ -61,7 +61,7 @@ internal static class PaymentModel
         {
             t.HasCheckConstraint("CK_JobRuns_State", "\"Status\" IN ('Pending','Processing','Completed','DeadLetter')");
             t.HasCheckConstraint("CK_JobRuns_Counters", "\"Attempts\" >= 0 AND \"ClaimVersion\" >= 0");
-            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox','Refund','Assign','ExpireOffer')");
+            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox','Refund','Assign','ExpireOffer','Reconcile','Heartbeat','PayoutSweep')");
             t.HasCheckConstraint("CK_JobRuns_Lease", "\"Status\" <> 'Processing' OR (\"LeaseOwner\" IS NOT NULL AND \"LeaseUntil\" IS NOT NULL)");
         });
         jobs.HasKey(x => x.Id).HasName("PK_JobRuns");

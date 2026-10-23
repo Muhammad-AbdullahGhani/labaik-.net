@@ -400,6 +400,35 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.DeviceToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("InvalidatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_DeviceTokens");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Devices_Token");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("DeviceTokens", "app");
+                });
+
             modelBuilder.Entity("Labaik.Infrastructure.Operations.Earning", b =>
                 {
                     b.Property<Guid>("Id")
@@ -734,6 +763,9 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("LeaseUntil")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("ScheduledFor")
                         .HasColumnType("timestamp with time zone");
 
@@ -756,7 +788,7 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_JobRuns_Counters", "\"Attempts\" >= 0 AND \"ClaimVersion\" >= 0");
 
-                            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox','Refund','Assign','ExpireOffer')");
+                            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox','Refund','Assign','ExpireOffer','Reconcile','Heartbeat','PayoutSweep')");
 
                             t.HasCheckConstraint("CK_JobRuns_Lease", "\"Status\" <> 'Processing' OR (\"LeaseOwner\" IS NOT NULL AND \"LeaseUntil\" IS NOT NULL)");
 
@@ -1041,6 +1073,16 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("Id", "FamilyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("FK_RefreshTokens_ParentFamily");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.DeviceToken", b =>
+                {
+                    b.HasOne("Labaik.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Devices_User");
                 });
 
             modelBuilder.Entity("Labaik.Infrastructure.Operations.Earning", b =>

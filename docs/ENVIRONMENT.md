@@ -75,11 +75,11 @@ Missing auth settings leave health available and authentication unavailable/fail
 | Payments__GatewayUrl | Core's configured gateway HTTP base address; no customer-supplied URL is accepted. |
 | Payments__WebhookEncryptionKey | Independent base64-encoded key whose decoded length is exactly 32 bytes; shared by gateway encoder/Core decoder. |
 | Payments__WebhookSignatureKey | Different base64-encoded 32-byte HMAC key; signature covers the raw encrypted body. |
-| Payments__EventReceiverUrl | Optional future durable follow-up receiver's full endpoint URL; not an email/FCM implementation. Missing configuration must not result in false publication success. |
-| Payments__EventReceiverKey | Private receiver authentication key; required for outbox publication. |
-| Gateway__WebhookUrl | Full signed-callback URL for the gateway dispatcher. Core's production callback is still unmapped until step 4. |
+| Payments__EventReceiverUrl | Historical/test external receiver only; production internal event routing ignores this variable. |
+| Payments__EventReceiverKey | Historical/test external receiver only; production internal routing ignores it. |
+| Gateway__WebhookUrl | Full signed-callback URL for the gateway dispatcher. The production signed callback is mapped. |
 | Gateway__ReturnUrl | Trusted server-configured browser return URL; redirects require HTTPS or loopback HTTP. Redirect does not prove payment. |
-| Gateway__DispatchEnabled | Optional gateway-dispatch switch; leave disabled until production callback activation in step 4. |
+| Gateway__DispatchEnabled | Optional gateway-dispatch switch; enabled by Compose now that capacity/refunds exist. |
 | Gateway__Simulation__CreateDelayMs | Optional bounded delay after checkout commit, used to model lost/late responses. |
 | Gateway__Simulation__QueryDelayMs | Optional bounded query latency. |
 | Gateway__Simulation__PayResponseDelayMs | Optional bounded delay after charge/event commit. |
@@ -91,4 +91,31 @@ Missing auth settings leave health available and authentication unavailable/fail
 | WEBHOOK_ENCRYPTION_KEY | Compose substitution source for the encryption key. |
 | WEBHOOK_SIGNATURE_KEY | Compose substitution source for the HMAC key. |
 
-New local .env generation includes payment keys. For an existing .env, scripts/add-payment-env.py appends only missing payment secrets without rotating existing database/auth credentials or printing values. There is no public simulation-control endpoint: faults are trusted operator configuration. Core payment services/worker implementations are registered but callback/sale routes and worker activation are deliberately deferred until capacity/refunds in step 4. Do not interpret the available signed callback adapter in test composition as a production route.
+New local .env generation includes payment keys. For an existing .env, scripts/add-payment-env.py appends only missing payment secrets without rotating existing database/auth credentials or printing values. There is no public simulation-control endpoint: faults are trusted operator configuration. Core checkout/callback routes and durable workers are activated with capacity/refund safeguards.
+
+## Core operations, files, delivery and telemetry
+
+| Name | Requirement / purpose |
+|---|---|
+| Payments__WorkersEnabled | Explicit Core worker activation, nightly reconciliation, weekly claims and per-instance heartbeat readiness. Enabled by Compose. |
+| Booking__BaseMinor | Positive server-side base fee in SAR minor units. |
+| Booking__DailyLimit | Nonnegative daily capacity, snapshotted when a date counter is first created. |
+| Booking__DateAddons__<yyyy-MM-dd> | Optional nonnegative date fee in minor units. |
+| Gateway__Simulation__FailRefundResponse | Optional lost response after durable fake refund commit. |
+| Storage__ConnectionString | Secret Azure shared-key connection; required for files. Readiness checks storage when configured. |
+| Storage__Container | Private evidence container name. |
+| STORAGE_CONNECTION_STRING | Optional Compose substitution for the storage connection. |
+| STORAGE_CONTAINER | Optional Compose substitution for the private container. |
+| Payouts__PerformerFeeMinor | Positive SAR fee snapshotted at completion, capped to booking total. |
+| Payouts__Accounts__<performer UUID> | Trusted secret Saudi IBAN per performer; snapshotted on first export. |
+| Notifications__EmailApiKey | Secret Resend API credential, used only by outbox delivery. |
+| Notifications__EmailFrom | Provider-verified sender; never logged. |
+| Notifications__EmailRecipients__<user UUID> | Operator-maintained recipient email; never used to identify/link users or grant roles. |
+| EMAIL_API_KEY | Optional Compose substitution for email provider credential. |
+| EMAIL_FROM | Optional Compose substitution for verified sender. |
+| OTEL_EXPORTER_OTLP_ENDPOINT | Optional trusted collector endpoint; enables trace export. |
+| OTEL_EXPORTER_OTLP_PROTOCOL | Optional standard exporter protocol selection. |
+| OTEL_EXPORTER_OTLP_HEADERS | Optional secret collector authentication headers. |
+| OTEL_SERVICE_NAME | Optional standard resource service-name override. |
+
+Private account/recipient mappings can be supplied as hierarchical environment configuration. Compose does not enumerate private user IDs: add them through an ignored local override or managed secret injection. No actual credential values are listed. Unconfigured notification channels are not promised to deliver; persistent accountant alerts/reports remain available.

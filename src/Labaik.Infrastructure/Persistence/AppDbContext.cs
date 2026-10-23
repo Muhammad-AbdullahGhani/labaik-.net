@@ -28,6 +28,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Earning> Earnings => Set<Earning>();
     public DbSet<PayoutBatch> PayoutBatches => Set<PayoutBatch>();
     public DbSet<PayoutItem> PayoutItems => Set<PayoutItem>();
+    public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("app");
@@ -36,6 +37,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         PaymentModel.Configure(modelBuilder);
         OperationsModel.Configure(modelBuilder);
         PayoutModel.Configure(modelBuilder);
+        var devices = modelBuilder.Entity<DeviceToken>();
+        devices.ToTable("DeviceTokens"); devices.HasKey(x => x.Id).HasName("PK_DeviceTokens");
+        devices.Property(x => x.Token).HasMaxLength(4096);
+        devices.HasIndex(x => x.Token).IsUnique().HasDatabaseName("UX_Devices_Token");
+        devices.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Devices_User");
     }
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

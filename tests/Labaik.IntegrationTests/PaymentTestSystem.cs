@@ -129,6 +129,7 @@ public sealed class PaymentTestSystem : IAsyncDisposable
         services.AddSingleton(decorate?.Invoke(gatewayClient) ?? gatewayClient);
         services.AddSingleton<IPaymentEventPublisher>(new HttpPaymentEventPublisher(receiverClient));
         services.AddSingleton(new BookingPolicy()); services.AddScoped<BookingMoney>(); services.AddScoped<BookingService>();
+        services.AddSingleton(new PayoutPolicy()); services.AddScoped<PayoutService>();
         services.AddScoped<PaymentCheckout>(); services.AddScoped<PaymentIngress>(); services.AddScoped<AssignmentService>(); services.AddScoped<WorkQueue>(); services.AddScoped<PaymentPump>();
         Services = services.BuildServiceProvider();
         _ingressHost = new HostBuilder().ConfigureWebHost(web => web.UseTestServer().Configure(app => app.Run(async context =>

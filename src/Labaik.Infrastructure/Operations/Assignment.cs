@@ -59,6 +59,7 @@ public sealed class AssignmentService(AppDbContext db, WorkQueue queue)
                     var result = booking.TryTransition(BookingState.Offered, ActorRole.System);
                     if (!result.IsSuccess) throw new PaymentConflictException(result.Reason!);
                     WorkQueue.Enqueue(db, WorkKind.ExpireOffer, offer.Id, offer.ExpiresAt); WorkQueue.Complete(job);
+                    Events.Add(db,booking.Id,"OfferCreated",$"offer:{offer.Id:N}",new { OfferId=offer.Id },now);
                 }
             }
         }

@@ -1,9 +1,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0.402 AS build
 WORKDIR /source
 COPY global.json Directory.Build.props ./
+# Dependency layers survive source-only edits; the shared package cache avoids repeated network downloads.
+COPY src/Labaik.Domain/Labaik.Domain.csproj ./src/Labaik.Domain/
+COPY src/Labaik.Application/Labaik.Application.csproj ./src/Labaik.Application/
+COPY src/Labaik.Infrastructure/Labaik.Infrastructure.csproj ./src/Labaik.Infrastructure/
+COPY src/Labaik.Api/Labaik.Api.csproj ./src/Labaik.Api/
+RUN --mount=type=cache,id=labaik-nuget,target=/root/.nuget/packages,sharing=locked dotnet restore src/Labaik.Api/Labaik.Api.csproj
 COPY src/ ./src/
-RUN dotnet restore src/Labaik.Api/Labaik.Api.csproj
-RUN dotnet publish src/Labaik.Api/Labaik.Api.csproj -c Release --no-restore -o /out /p:UseAppHost=false
+RUN --mount=type=cache,id=labaik-nuget,target=/root/.nuget/packages,sharing=locked dotnet publish src/Labaik.Api/Labaik.Api.csproj -c Release --no-restore -o /out /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.13 AS final
 # curl is only for the container readiness probe; the process itself runs as the built-in unprivileged user.

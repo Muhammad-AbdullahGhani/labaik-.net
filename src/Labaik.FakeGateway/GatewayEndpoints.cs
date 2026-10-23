@@ -28,7 +28,7 @@ internal static class GatewayEndpoints
     {
         app.Use(async (context, next) =>
         {
-            if ((context.Request.Path.StartsWithSegments("/checkouts") || context.Request.Path.StartsWithSegments("/refunds")))
+            if ((context.Request.Path.StartsWithSegments("/checkouts") || context.Request.Path.StartsWithSegments("/refunds") || context.Request.Path.StartsWithSegments("/transactions")))
             {
                 var expected = app.Configuration["Gateway:ApiKey"];
                 if (expected is not { Length: >= 32 }) { context.Response.StatusCode = 503; return; }
@@ -37,6 +37,13 @@ internal static class GatewayEndpoints
                 { context.Response.StatusCode = 401; return; }
             }
             await next(context);
+        });
+        app.MapGet("/transactions", async (Guid? after, GatewayDbContext db, HttpContext context) =>
+        {
+            var rows=await (from charge in db.Charges.AsNoTracking() join refund in db.Refunds on charge.Id equals refund.TransactionId into refunds from refund in refunds.DefaultIfEmpty()
+                where after==null || charge.Id.CompareTo(after.Value)>0 orderby charge.Id
+                select new GatewayLedgerRow(charge.CheckoutId,charge.BookingId,charge.Id,charge.AmountMinor,charge.Currency,refund==null?null:refund.Id)).Take(250).ToArrayAsync(context.RequestAborted);
+            return Results.Ok(new GatewayLedgerPage(rows,rows.Length==250?rows[^1].TransactionId:null));
         });
         app.MapPost("/refunds", async (RefundCommand command, GatewayService service, GatewaySimulation faults, HttpContext context) =>
             await Handle(async () => { var result = await service.RefundAsync(command, context.RequestAborted); return faults.FailRefundResponse ? Results.StatusCode(503) : Results.Ok(result); }));

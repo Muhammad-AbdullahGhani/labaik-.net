@@ -1,6 +1,6 @@
 # Demo preparation - plain-language notes
 
-Keep this beside the code. Updated as implementation and real checks finish. Step 3 is complete locally: 28 new payment tests passed, 0 failed/skipped; Release build passed with 0 warnings/errors. Older suites were not rerun this turn, as requested. Public Core payment activation is still reserved for step 4.
+Keep this beside the code. Steps 4-6 are committed and lean step 7 has passed its final local regression: 823 tests passed, none failed or skipped. Public mutations require authentication; callbacks require valid cryptography. See VERIFICATION.md for exact evidence and external limits.
 
 ## My opening (about 30 seconds)
 
@@ -14,7 +14,8 @@ Keep this beside the code. Updated as implementation and real checks finish. Ste
 4. Show integer pricing and one rounding example.
 5. Explain identity using project plus Firebase UID; email is not an account key.
 6. Show the verified new payment tests: double taps, a lost gateway response, repeated/old callbacks, then a worker restart.
-7. Finish with what is still disabled and the next step: capacity and automatic refunds.
+7. Show the 200-user capacity/voucher checks, offer deadline race, private file protections and payout double-run.
+8. Finish with the honest limits: no hosted service, real charge, bank transfer or live provider delivery was claimed.
 
 ## What the layers mean
 
@@ -71,9 +72,9 @@ Keep this beside the code. Updated as implementation and real checks finish. Ste
 
 - No public hosted deployment or live Firebase project exchange has been verified.
 - No real bank transfer, real HyperPay charge or actual customer card processing exists.
-- Public checkout/capture remains disabled until step 4 adds capacity and refund safeguards.
-- Capacity allocation, automated refunds, assignment, payouts, files and notifications are not finished.
-- Only the new step-3 suite was run this turn; older test results are historical. A 200-way checkout test is NOT proof of daily-capacity protection; that application logic is next.
+- Checkout and signed callbacks are enabled with capacity/refund protection; this remains a fake gateway, not real HyperPay.
+- Local tests cover capacity, automatic full refunds, assignment, completion, payout claims, private grants and notification routing. Live provider delivery and bank acceptance remain unverified.
+- The final full regression passed, including NBomber capacity and both voucher limits at 200 users. Use VERIFICATION.md for current totals.
 
 ## Commands and evidence
 
@@ -146,7 +147,7 @@ Tests create an isolated PostgreSQL container with generated data and remove it 
 
 **What if the worker dies after sending?** "The receiver might see the same message again. I send the same message ID every time so a durable receiver can recognise the duplicate. The test receiver stores one receipt even when it receives two deliveries."
 
-**Why are payment routes disabled?** "Opening checkout before date capacity and refund handling would expose an unfinished money flow. The internal implementation is reviewable and tested now; activation follows those safeguards."
+**Why did payment routes stay disabled until step 4?** "The payment flow needed capacity and refund safeguards first. Those safeguards now exist, so checkout is authenticated and callbacks require a valid signature."
 
 **How do retries stop?** "Provider failures back off and eventually leave a visible dead-letter job. A normal still-pending payment is not counted as a provider error, and it never causes me to open a new charge attempt."
 
@@ -157,12 +158,38 @@ Tests create an isolated PostgreSQL container with generated data and remove it 
 "The date has a counter that the database can increment only while it is below the limit. Capture and booking allocation commit together. A payment arriving for a full date is recorded and refunded, rather than silently accepted."
 
 Actual focused result: 200 paid attempts -> 50 fulfilled booking slots and 150 confirmed full refunds. Five new tests passed, including voucher limits and cancellation races. Public booking/callback routes are now protected and available; automatic processing needs configured gateway keys and worker activation. Earlier disabled-route notes describe historical step 3, not the current stage.
-
 ## Explain assignment and private files
-ìOnly one short database transaction chooses a performer at a time. Both accepting and expiring an offer take that same lock and check the database clock. Unique indexes also stop a booking or performer having two active offers.î
-ìFiles live in a private container. Upload links last five minutes, allow creating one exact object and cannot overwrite it. Before a read link is issued we check the user and booking; approval freezes the saved object identity.î
+‚ÄúOnly one short database transaction chooses a performer at a time. Both accepting and expiring an offer take that same lock and check the database clock. Unique indexes also stop a booking or performer having two active offers.‚Äù
+‚ÄúFiles live in a private container. Upload links last five minutes, allow creating one exact object and cannot overwrite it. Before a read link is issued we check the user and booking; approval freezes the saved object identity.‚Äù
 Demo: show the accept/expiry test, then the file test rejecting another user's read, a changed upload path and an overwrite. Azure was tested locally with Azurite, not deployed to a cloud account. File metadata validation is not malware scanning.
-
 ## Explain payouts in 30 seconds
-ìA completed booking creates one earning after a supervisor approves proof. A payout batch claims earnings in a database transaction, and a unique index prevents another live batch claiming the same earning. Exporting a CSV does not mark money paid: an accountant records the confirmed bank result, and only a confirmed failure returns earnings to the pool.î
+‚ÄúA completed booking creates one earning after a supervisor approves proof. A payout batch claims earnings in a database transaction, and a unique index prevents another live batch claiming the same earning. Exporting a CSV does not mark money paid: an accountant records the confirmed bank result, and only a confirmed failure returns earnings to the pool.‚Äù
 Demo: run PayoutTests, point to UX_Items_ClaimedEarning and the unique booking earning index, then show that repeat CSV export leaves Pending. Never retry an uncertain bank transfer as a new batch. The CSV is a generic bank instruction format; a real bank must approve its format before use. Saudi IBANs come from trusted environment configuration, not customer input, and are snapshotted on first export.
+
+
+## Finish the demo: notifications, recovery and limits
+
+?Payment confirmation saves follow-up work in the same transaction. A worker creates assignment and recipient jobs later. Each channel retries independently, and a bad device token is removed; a lost delivery acknowledgement may still cause a repeat push.?
+?The nightly comparison reports differences between the gateway and our database. It does not guess that money moved or silently fix a ledger. The operations endpoint shows reports, payment alerts and jobs that exhausted their retries.?
+?Each worker writes a heartbeat. Readiness checks the database, configured private storage and this instance's worker. Turning off the process does not erase queued work: another process can recover an expired claim.?
+
+Suggested five-minute version:
+
+1. Product, layers and separate gateway: 30 seconds.
+2. Payment uncertainty/idempotency and webhook re-query: 60 seconds.
+3. Capacity test: 200 paid customers, only 50 slots, 150 refunds: 45 seconds.
+4. Offer deadline race and payout double-run: 60 seconds.
+5. Private file grant and Firebase UID separation: 45 seconds.
+6. Actual test evidence and honest limitations: 40 seconds.
+
+Run focused demos with `dotnet test tests/Labaik.IntegrationTests --configuration Release --filter FullyQualifiedName~CapacityRefundTests`, then AssignmentTests, PayoutTests, PrivateFileTests or LoadTests as needed. Do not run all suites live in a short interview: show the saved verification results and rerun one relevant proof. A concise load report is checked into load/results; it is a local correctness check, not a production throughput promise.
+
+What I cut: admin UI, XLSX, elaborate templates, multiple providers, trace dashboards and separate worker deployment. What still needs real access: hosted services/GHCR, actual Firebase login/push, Azure cloud storage, Resend recipient delivery and bank-specific CSV acceptance. Email destinations are currently operator configuration, not self-service email linking. There is no automated bank transfer, partial refund, dispute clawback or malware scanning.
+
+
+A useful failure story: the local upgrade check caught an already-applied migration being regenerated under a different ID. The migration task failed and blocked rollout. I kept the old migration and added a separate additive migration, then tested both a fresh database and the retained database. The lesson is that an applied migration is history: do not rewrite it, even if a fresh-database test passes.
+
+Exact final test wording: ?The full Release run passed 823 tests. I then changed stale-notification handling and migration history, so I ran the affected 15 tests again; all passed. I did not claim a second full regression after those fixes.?
+
+
+Final local stack proof: both services answered live/ready with 200 and ran as non-root; the migration upgrade succeeded against the retained database. I stopped the stack cleanly afterward. Restart it with docker compose up --build --wait for the demo; use the focused test commands if live Firebase credentials are unavailable.

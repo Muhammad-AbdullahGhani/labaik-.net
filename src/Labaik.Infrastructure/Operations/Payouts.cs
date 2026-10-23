@@ -73,6 +73,8 @@ public sealed class CompletionService(AppDbContext db, WorkQueue queue, PayoutPo
             if (!await db.Earnings.AnyAsync(x => x.BookingId == bookingId, ct))
                 db.Earnings.Add(new Earning { Id = Guid.NewGuid(), BookingId = bookingId, PerformerId = offer!.PerformerId, AmountMinor = Math.Min(policy.PerformerFeeMinor, booking.TotalMinor), CompletedAt = await queue.Now(ct) });
             offer!.Status = "Finished";
+            if (!await db.OutboxMessages.AnyAsync(x => x.DedupKey == $"completed:{bookingId:N}",ct))
+                Events.Add(db,bookingId,"BookingCompleted",$"completed:{bookingId:N}",new { BookingId=bookingId },await queue.Now(ct));
         }
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
     }

@@ -6,11 +6,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 namespace Labaik.Infrastructure.Hosting;
 
 public static class ServiceHost
 {
+    public static readonly ActivitySource Activities = new("Labaik.Core");
     public static void AddHealthOnlyHost(WebApplicationBuilder builder, string schema)
     {
         builder.Logging.ClearProviders();
@@ -25,6 +28,13 @@ public static class ServiceHost
         builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
         builder.Logging.AddFilter("Npgsql", LogLevel.None);
         builder.Logging.AddFilter("System.Net.Http.HttpClient", LogLevel.None);
+        builder.Services.AddOpenTelemetry().ConfigureResource(resource => resource.AddService(schema=="app"?"labaik-api":"labaik-gateway"))
+            .WithTracing(tracing =>
+            {
+                // Explicit spans avoid exporting arbitrary URL queries, signed blob grants or personal identifiers.
+                tracing.AddSource("Labaik.Core");
+                if(!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"])) tracing.AddOtlpExporter();
+            });
         builder.Services.AddSingleton(services =>
         {
             var connectionString = services.GetRequiredService<IConfiguration>().GetConnectionString("Database");
@@ -48,12 +58,15 @@ public static class ServiceHost
             context.Response.Headers["X-Correlation-ID"] = correlationId;
             using var scope = app.Logger.BeginScope(new Dictionary<string, object> { ["CorrelationId"] = correlationId });
             var started = Stopwatch.GetTimestamp();
+            using var activity = Activities.StartActivity("http.request");
+            activity?.SetTag("http.request.method",context.Request.Method);
             try
             {
                 await next(context);
             }
             finally
             {
+                activity?.SetTag("http.response.status_code",context.Response.StatusCode);
                 app.Logger.LogInformation("Request completed with status {StatusCode} in {ElapsedMs} ms",
                     context.Response.StatusCode, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
             }

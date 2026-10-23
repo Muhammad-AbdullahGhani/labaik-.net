@@ -1,10 +1,10 @@
 # Design
 
-Status: steps 1, 2a, 2b and 3 implemented locally. Step 3 verification ran only the new payment suite at the user's request; previous regression results are historical. Core public payment routes/workers stay disabled until step 4. No later step is authorized.
+Status: lean steps 1-7 are implemented locally. The approved final Release regression passed 823 tests with zero failures/skips, followed by a focused delivery regression for a stale-event fix. Local Compose verification is recorded in VERIFICATION.md. No public hosting, real money transfer or live Firebase/Azure/email delivery is claimed.
 
 ## Architecture
 
-Proposed: Domain / Application / Infrastructure / Api; separate fake gateway HTTP service using a restricted fake_gateway schema in the same PostgreSQL database. Core and gateway never share transactions. Hosted workers use durable row claims, leases and fencing, without advisory locks. The reduced entity model and seven core steps are in PLAN.md; document actual implementation and environment names (never values) as built.
+Implemented: Domain / Application / Infrastructure / Api; separate fake gateway HTTP service using a restricted fake_gateway schema in the same PostgreSQL database. Core and gateway never share transactions. Hosted workers use durable row claims, leases and fencing, without advisory locks. The reduced entity model and seven core steps are in PLAN.md; document actual implementation and environment names (never values) as built.
 
 ## State machine diagram
 
@@ -42,7 +42,7 @@ Implemented: booking version checks, named money/capacity checks and transaction
 
 ## Failure scenarios tested
 
-Latest runs include real PostgreSQL readiness/isolation, monetary constraint rejection, stale booking writes and identity replay races; all passed. The initial Docker-unavailable run is historical. Payment/offer/payout crash tests have not run because those features are not implemented. Record each future scenario, test name, observed invariant, and remaining limitation here after implementation. Planned scenarios include crash after charge, gateway timeout, webhook before redirect, payment after cancellation, capacity overflow, offer expiry, payout retries, and refresh-token replay.
+Latest runs include real PostgreSQL readiness/isolation, monetary constraint rejection, stale booking writes and identity replay races; all passed. The initial Docker-unavailable run is historical. The later step evidence below supersedes the initial skeleton status. Automated scenarios cover crash after charge, gateway timeout, webhook before redirect, payment after cancellation, capacity overflow, offer expiry, payout retries, and refresh-token replay.
 
 ## Trade-offs
 
@@ -74,7 +74,7 @@ With working Docker, corrected a Testcontainers file/directory mapping bug. Full
 
 BookingStateMachine owns the explicit state/role table; unknown enums, self-transitions and all missing edges/roles return a failed RuleResult with a reason for a future API 409. Accountant has no booking transition privileges. Admin cannot manufacture Paid/Refunded or act as the performer. Booking state setters are private. Actor ownership, verified payment/refund evidence, assignment/deadline checks and transactional side effects remain application work; a role-table success alone is not sufficient authorization for those future operations. No business HTTP routes were added.
 
-Money is a nonnegative SAR long value with checked addition/subtraction. PricingPolicy snapshots server configuration; date add-ons, fixed clamps and exact floor-rounded basis points produce immutable quotes. Percentage multiplication uses quotient/remainder to avoid overflowing an otherwise valid long result. Zero-total checkout is rejected. Voucher eligibility uses an explicit time and usage snapshot; atomic redemption/capacity allocation is not implemented yet.
+Money is a nonnegative SAR long value with checked addition/subtraction. PricingPolicy snapshots server configuration; date add-ons, fixed clamps and exact floor-rounded basis points produce immutable quotes. Percentage multiplication uses quotient/remainder to avoid overflowing an otherwise valid long result. Zero-total checkout is rejected. Voucher eligibility uses an explicit time and usage snapshot; atomic redemption and conditional capacity allocation were added in step 4.
 
 BookingCore migration creates User, Booking, DailyCapacity, Voucher and VoucherRedemption with named checks/FKs/indexes. SQL numeric casts protect the total CHECK expression from bigint intermediate overflow; nullable discount shapes explicitly check IS NOT NULL because SQL UNKNOWN otherwise passes CHECK. EF versions increment on every tracked booking update while retaining the original token in WHERE; raw SQL/bulk writers must explicitly check/increment it. No generic audit or identity behavior was added.
 
@@ -104,7 +104,7 @@ Gateway checkouts, charges and encrypted events live in fake_gateway with its ow
 
 Webhook envelope version 1 contains a version byte, fresh nonce, GCM tag and ciphertext; HMAC-SHA256 covers the entire raw envelope. Core bounds body size, verifies HMAC before decrypting, validates fields, stores the exact encrypted body/signature and deduplicates UNIQUE(provider,eventId) before acknowledging. Reusing an event ID with different wire bytes is quarantined. Provider retries must reuse the stored event body rather than re-encrypting it under the same ID. This is a documented simulation protocol, not a claim of real HyperPay wire compatibility or transparent multi-key rotation.
 
-Workers re-query the authenticated gateway and check checkout/key/booking/amount/currency/transaction identity before credit. Gateway observations happen outside transactions; inside the commit transaction, job ownership and current booking/attempt state are re-read. Succeeded/Failed local attempts never regress on an older Pending response. Capture ledger, Paid transition/version, BookingPaid outbox intent and inbox acknowledgement commit together. BookingPaid is a durable integration event for future assignment/email/push handlers; those business integrations are not implemented here. Late payment on Cancelled records the capture plus RefundRequired/AccountantAlert intents without resurrecting the booking. Actual capacity allocation/refund execution is step 4, so public Core checkout/callback routes and payment worker activation remain disabled now.
+Workers re-query the authenticated gateway and check checkout/key/booking/amount/currency/transaction identity before credit. Gateway observations happen outside transactions; inside the commit transaction, job ownership and current booking/attempt state are re-read. Succeeded/Failed local attempts never regress on an older Pending response. Capture ledger, Paid transition/version, BookingPaid outbox intent and inbox acknowledgement commit together. At step 3 BookingPaid targeted an external durable receiver; step 7 replaces production routing with internal durable assignment and recipient delivery. Late payment on Cancelled records the capture plus RefundRequired/AccountantAlert intents without resurrecting the booking. Step 4 added actual capacity/refund execution and enabled protected sale/callback routes; step 7 enables the worker in Compose.
 
 JobRun claims use unique schedule keys, FOR UPDATE SKIP LOCKED, database-clock leases and increasing claim versions. Immediate per-entity jobs use a canonical scheduled slot; retries move AvailableAt rather than insert another schedule. Queries/sends run outside DB transactions. Final writes require the matching live owner/version under a row lock; crashed owners recover after lease expiry. Healthy pending-payment polling resets the error budget, while consecutive failures back off and dead-letter. Clearing EF tracked changes after a rolled-back business write prevents accidentally saving those failed inserts with the retry update. Generic receiver errors are stored as exception-type codes, never payload/secret details.
 
@@ -143,5 +143,35 @@ Capacity is allocated only on verified capture using a bounded UPDATE on the dat
 Assignment uses one short PostgreSQL mutex-row transaction, active-offer unique indexes and database deadlines. Acceptance and expiry use the same lock order. Three assignment tests passed, including concurrent accept/expiry and scheduler exclusion.
 Private Azure Blob grants are exact-path, five-minute and create-only; approved content cannot be overwritten using the upload grant. One real Azurite test passed for private reads, ownership, path isolation and overwrite denial. Azure cloud credentials were unavailable; cloud deployment was not verified. Upload completion enforces size/content-type metadata; malware inspection and privileged storage-owner tampering remain outside this scope.
 
-## Step 6 — completion and payout claims
+## Step 6 â€” completion and payout claims
 Completion checks assigned performer, uploaded proof and supervisor-approved proof; one earning per booking commits with completion. Amount is a configured SAR fee capped to the booking total. Weekly batches include available completed earnings through the end of a closed UTC week, including older failed claims. A short shared SQL mutex serializes completion/dispute/payout decisions; this is conservative for low volume. Earning row claims plus partial UNIQUE(EarningId) for Pending/Paid payout items provide a second guarantee. Failed batches release claims; unknown bank outcomes remain Pending. Bank confirmation requires an explicit unique reference. CSV is deterministic, snapshots the configured checksum-valid Saudi IBAN on first export and does not send money. A dispute after export/payment needs accountant investigation, not automatic clawback. Bank-specific CSV certification remains external work.
+
+
+## Step 7: delivery and operations
+
+BookingPaid routes to a durable Assign job and a separate outbox row/job per configured recipient/channel. OfferCreated and BookingCompleted commit with their business updates; expired offers and cancelled paid events cannot send stale assignment promises. All email/FCM network calls happen in the dispatcher outside transactions. Trusted operator configuration supplies email destinations per user ID; email never selects or links an identity. No recipient/device means that channel is not requested. Arabic/English plaintext templates contain no passport, signed URL or payment credential. Resend uses the stable message ID as its idempotency key; FCM may duplicate after an ambiguous send. Unregistered FCM tokens are invalidated. Bounded retries/backoff and dead letters reuse the existing durable claim protocol. Provider credential/delivery acceptance still needs live smoke tests.
+
+Nightly unique schedules compare the gateway's authenticated paged capture/refund ledger with local rows. The report stores counts and up to 1,000 mismatch entries on JobRun; scans beyond 25,000 remote rows fail visibly. Reads observe a moving ledger, so recent mismatches may be temporary; drain workers and recheck before manual action. Reconciliation reports do not mutate money. Immediate stable-key recovery remains separate. Weekly unique jobs create deterministic per-week/per-performer payout request keys and use the same earning-claim service; actual bank execution remains an operator task.
+
+Core writes a per-instance heartbeat every five seconds and checks it against database time at readiness; older than thirty seconds fails readiness. Configured Azure storage joins readiness, while missing optional storage keeps file endpoints unavailable rather than pretending files work. Explicit OpenTelemetry HTTP/job spans avoid arbitrary URL/query/header/body/identifier tags; an optional OTLP collector is configured by environment. Provider call spans, dashboards and collector deployment are deferred. Hosted-service cancellation leaves durable claims to expire and resume.
+
+During a mixed-version managed rollout, disable workers on old replicas, apply additive migrations, roll all API replicas with workers disabled, then enable the new workers. HTTP can continue accepting durable intents during the brief processing pause. This avoids old binaries claiming newly introduced job kinds; a new enum/CHECK alone is not a complete rolling-worker compatibility strategy. No zero-downtime managed deployment was verified.
+
+## Current failure evidence and limits
+
+- Lost checkout/charge/refund responses recover the original persisted keys; no new charge is opened for an unknown outcome.
+- Signed duplicated/out-of-order callbacks re-query the gateway; capture/state/capacity/voucher/outbox commit atomically. A forced outbox write failure rolls them back.
+- Payment after cancellation/full capacity records one capture and a durable full refund; slots release once.
+- Offer acceptance and expiry compete under the same SQL lock and database deadline; active-booking/performer indexes provide a second guard.
+- Concurrent payout batches claim each earning once. Repeated export is stable and remains Pending; confirmed Failed releases claims, Paid never does.
+- Actual PostgreSQL/Azurite tests cover identity replay, SDK signature/project/expiry/revocation verification, file ownership, exact-path SAS, private reads and overwrite denial.
+- Crash recovery uses deterministic failpoints and HTTP host restarts against persistent databases. No literal process-kill chaos campaign, public-network benchmark or paid production deployment is claimed.
+
+## What I would do next
+
+Select hosting and run the documented managed-host steps; verify live Firebase/FCM, Azure and Resend credentials; certify the CSV with a bank. Add audited role/provisioning and dispute/clawback procedures, mail-address verification/self-service preferences, file malware inspection and retention policies. Migrate registration-token clients to FIDs before removing the narrowly documented deprecated SDK field. Extend reconciliation pagination/report artifacts and renew leases for larger deployments. Add telemetry provider spans and dashboards only after correctness and external acceptance are verified.
+
+
+Final local deployment evidence: both images built, explicit migration tasks succeeded against the retained volume, four health probes returned 200 and both processes ran as UID 1654. The unconfigured-provider minimal stack does not establish file/email/FCM readiness. Shutdown completed cleanly. See VERIFICATION.md for the caught migration failure and successful additive retry.
+
+Provider references: [Firebase Admin message recipient fields](https://firebase.google.com/docs/reference/admin/dotnet/class/firebase-admin/messaging/message) distinguish registration tokens from FIDs; [Resend idempotency](https://resend.com/changelog/idempotency-keys) supports the stable send key. Neither replaces our durable retry state or establishes universal exactly-once delivery.

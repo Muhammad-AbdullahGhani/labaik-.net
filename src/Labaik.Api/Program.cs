@@ -5,6 +5,7 @@ using Labaik.Domain.Bookings;
 using Labaik.Infrastructure.Identity;
 using Labaik.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Labaik.Infrastructure.Operations;
 
 // Consume the runner switch before ASP.NET's key/value command-line configuration parser sees it.
 var migrateOnly = args is ["--migrate"];
@@ -18,6 +19,8 @@ builder.Services.AddDbContext<AppDbContext>((services, options) =>
 AuthEndpoints.AddIdentity(builder);
 builder.Services.AddPaymentCore(builder.Configuration);
 if (builder.Configuration.GetValue("Payments:WorkersEnabled", false)) builder.Services.AddHostedService<PaymentWorker>();
+if (builder.Configuration.GetValue("Payments:WorkersEnabled", false)) builder.Services.AddHealthChecks().AddCheck<WorkerReadiness>("worker",tags:["ready"]);
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Storage:ConnectionString"])) builder.Services.AddHealthChecks().AddCheck<BlobReadiness>("storage",tags:["ready"],timeout:TimeSpan.FromSeconds(3));
 var app = builder.Build();
 // Validate configuration without opening a database connection or applying migrations.
 _ = app.Services.GetRequiredService<Npgsql.NpgsqlDataSource>();

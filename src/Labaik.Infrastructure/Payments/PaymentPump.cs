@@ -7,15 +7,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Labaik.Infrastructure.Payments;
 
-public sealed class PaymentPump(AppDbContext db, WorkQueue queue, IPaymentGateway gateway, WebhookCodec codec, IPaymentEventPublisher publisher, BookingMoney money, AssignmentService assignment)
+public sealed class PaymentPump(AppDbContext db, WorkQueue queue, IPaymentGateway gateway, WebhookCodec codec, IPaymentEventPublisher publisher, BookingMoney money, AssignmentService assignment, PayoutService payouts)
 {
     public async Task<bool> RunOnceAsync(WorkKind? kind = null, CancellationToken ct = default)
     {
         var claim = await queue.ClaimAsync(kind, ct);
         if (claim is null) return false;
+        using var activity = Labaik.Infrastructure.Hosting.ServiceHost.Activities.StartActivity("job.run");
+        activity?.SetTag("job.kind",claim.Kind.ToString());
         try
         {
-            if (claim.Kind is WorkKind.Assign or WorkKind.ExpireOffer) await assignment.HandleAsync(claim, ct);
+            if (claim.Kind == WorkKind.PayoutSweep) await new WeeklyPayouts(db,queue,payouts).HandleAsync(claim,ct);
+            else if (claim.Kind == WorkKind.Reconcile) await new ReconciliationService(db,queue,gateway).HandleAsync(claim,ct);
+            else if (claim.Kind is WorkKind.Assign or WorkKind.ExpireOffer) await assignment.HandleAsync(claim, ct);
             else if (claim.Kind == WorkKind.Refund) await RefundAsync(claim, ct);
             else if (claim.Kind == WorkKind.Outbox) await PublishAsync(claim, ct);
             else await VerifyAsync(claim, ct);

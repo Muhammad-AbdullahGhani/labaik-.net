@@ -6,6 +6,12 @@ namespace Labaik.Infrastructure.Payments;
 
 public sealed class HttpPaymentGateway(HttpClient client) : IPaymentGateway
 {
+    public async Task<GatewayLedgerPage> ListAsync(Guid? after, CancellationToken ct)
+    {
+        using var response = await client.GetAsync("transactions" + (after is null ? "" : $"?after={after:D}"),ct);
+        if (!response.IsSuccessStatusCode) throw new PaymentDependencyException();
+        return await response.Content.ReadFromJsonAsync<GatewayLedgerPage>(ct) ?? throw new PaymentDependencyException();
+    }
     public async Task<GatewaySnapshot> CreateAsync(CheckoutCommand command, CancellationToken ct)
     {
         try { using var response = await client.PostAsJsonAsync("checkouts", command, ct); return await Read(response, ct); }
