@@ -2,6 +2,8 @@
 
 Status: preparation and local checks only. Real Resend email receipt and FCM browser receipt must be observed before calling live delivery verified. Storage stays on the existing Azurite-tested path; no Azure trial is needed for this notification demo.
 
+User-observed update: the email setup helper completed and the API restarted healthy with the authenticated recipient mapping. No email receipt has been observed yet. A [guided frontend](FRONTEND_DEMO.md) now provides login, booking, checkout, simulation, status and direct authenticated push registration; prefer it for the interview. The separate loopback receiver and PowerShell steps below remain available as focused troubleshooting tools.
+
 ## 1. Resend setup
 
 Create/sign in to a [Resend account](https://resend.com/). Use an inbox you control. In API Keys, create a key with Sending access and keep it private. Do not paste the key into chat, the repository, a screen-shared terminal command or the browser receiver.

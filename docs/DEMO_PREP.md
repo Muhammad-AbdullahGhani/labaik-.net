@@ -1,5 +1,7 @@
 # Demo preparation - plain-language notes
 
+For the easiest current presentation, use the [guided frontend walkthrough](FRONTEND_DEMO.md). It replaces most PowerShell commands with login, booking, checkout, simulation, status and push-registration controls. The older command blocks remain useful for explaining/testing the API. Email configuration is user-observed successful; actual email/push receipt is still pending.
+
 Keep this beside the code. Steps 4-6 are committed and lean step 7 has passed its final local regression: 823 tests passed, none failed or skipped. Public mutations require authentication; callbacks require valid cryptography. See VERIFICATION.md for exact evidence and external limits.
 
 ## My opening (about 30 seconds)

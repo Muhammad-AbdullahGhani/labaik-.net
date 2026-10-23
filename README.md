@@ -6,6 +6,7 @@ Lean steps 1-7: .NET 10/PostgreSQL backend with Firebase identity, rotating sess
 - [Environment variable names and auth setup](docs/ENVIRONMENT.md)
 - [Actual verification](docs/VERIFICATION.md)
 - [Plain-language demo preparation](docs/DEMO_PREP.md)
+- [Guided local frontend](docs/FRONTEND_DEMO.md): login, booking, safe checkout retry, fake payment, status, push and privileged operations.
 - [Design](docs/DESIGN.md), [plan](docs/PLAN.md), [AI log](docs/AI_LOG.md)
 
 After one-time `python scripts/create-local-env.py`, run `docker compose up --build --wait`. Requires Linux Docker. Existing .env files are preserved; see identity setup for adding auth configuration. Runtime startup never applies migrations: Compose runs separate tasks first. Without Firebase/auth settings, health works and authentication fails closed. No production fake verifier exists.

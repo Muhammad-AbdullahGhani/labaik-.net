@@ -4,7 +4,7 @@
 
 - Labaik Core is the .NET 10 / PostgreSQL backend defined in docs/ASSIGNMENT.md. This is not an Expo or Firestore application.
 - Read docs/ASSIGNMENT.md, this file, and docs/PLAN.md before implementation. User instructions take precedence over proposals in the plan.
-- Current authorization: finish verification and documentation of the lean steps 4 through 7 under the user-approved timebox, then stop for review. Keep one commit per step, maintain easy-language DEMO_PREP.md, and honestly document incomplete/unverified integrations. The final full regression was approved and ran; use focused follow-up checks for subsequent fixes. No optional dashboard/XLSX polish or paid hosting.
+- Current authorization: the user subsequently requested live email/FCM configuration and a minimal guided demo frontend. Preserve the working email/Firebase settings, keep provider/gateway credentials server-side, and enable local simulation UI only behind explicit Demo environment/config gates. Maintain easy-language demo notes and run focused affected tests, not the whole regression. No paid hosting, automatic role grants or claim of live notification receipt without observation. Earlier seven-step scope/stop limits were superseded for this requested demo work; optional XLSX and dashboard polish remain out of scope.
 - Use Domain / Application / Infrastructure / Api boundaries and a separate fake gateway HTTP project. Gateway data lives in its own schema in the same PostgreSQL database; no shared transactions across the HTTP boundary.
 
 ## Interview-grade rules

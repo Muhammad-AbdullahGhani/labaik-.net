@@ -18,6 +18,7 @@ builder.Services.AddDbContext<AppDbContext>((services, options) =>
     options.UseNpgsql(services.GetRequiredService<Npgsql.NpgsqlDataSource>(), postgres => postgres.MigrationsHistoryTable("__EFMigrationsHistory", "app")));
 AuthEndpoints.AddIdentity(builder);
 builder.Services.AddPaymentCore(builder.Configuration);
+DemoEndpoints.Add(builder);
 if (builder.Configuration.GetValue("Payments:WorkersEnabled", false)) builder.Services.AddHostedService<PaymentWorker>();
 if (builder.Configuration.GetValue("Payments:WorkersEnabled", false)) builder.Services.AddHealthChecks().AddCheck<WorkerReadiness>("worker",tags:["ready"]);
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Storage:ConnectionString"])) builder.Services.AddHealthChecks().AddCheck<BlobReadiness>("storage",tags:["ready"],timeout:TimeSpan.FromSeconds(3));
@@ -67,6 +68,7 @@ ServiceHost.MapHealthOnlyHost(app);
 AuthEndpoints.Map(app);
 BookingEndpoints.Map(app);
 OperationsEndpoints.Map(app);
+DemoEndpoints.Map(app);
 await app.RunAsync();
 
 // Named entry point keeps WebApplicationFactory types unambiguous when testing both executables.

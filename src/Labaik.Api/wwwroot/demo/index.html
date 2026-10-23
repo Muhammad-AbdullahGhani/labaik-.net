@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Labaik Core · Demo workspace</title>
+  <link rel="stylesheet" href="/demo/style.css">
+  <script defer src="https://www.gstatic.com/firebasejs/13.0.0/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/13.0.0/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/13.0.0/firebase-messaging-compat.js"></script>
+  <script defer src="/demo/config.js"></script>
+  <script defer src="/demo/app.js"></script>
+</head>
+<body>
+  <div class="workspace">
+    <aside class="sidebar">
+      <a class="brand" href="/demo/">Labaik<span>Core</span></a>
+      <p class="sidebar-label">DEMO WORKSPACE</p>
+      <nav aria-label="Workspace">
+        <a href="#booking-section">Bookings <span>01</span></a>
+        <a href="#notification-section">Notifications <span>02</span></a>
+        <a href="#operations-section" id="operations-link" hidden>Operations <span>03</span></a>
+      </nav>
+      <div class="sidebar-note"><span class="dot"></span> Local simulation<p>Real Firebase sign-in.<br>Simulated payments.<br>No card details collected.</p></div>
+    </aside>
+    <main>
+      <header class="topbar"><span>Booking &amp; payment workspace</span><div id="identity" hidden><span id="role-label"></span><button id="logout" class="text-button">Sign out</button></div></header>
+      <div class="page-heading"><div><p class="eyebrow">LABAIK CORE</p><h1>A clear path from<br>booking to confirmation.</h1><p class="intro">Follow one booking, verify the payment, then check its notifications.</p></div><div class="environment"><span class="dot"></span> Demo environment</div></div>
+      <p id="notice" class="notice" role="status" hidden></p>
+
+      <section id="login-section" class="login-layout">
+        <div class="panel login-panel">
+          <p class="eyebrow">START HERE</p><h2>Sign in to your account</h2>
+          <p class="muted">Use your Firebase demo account. New identities receive Customer access.</p>
+          <form id="login-form">
+            <label for="email">Email address</label><input id="email" type="email" autocomplete="username" required placeholder="Your demo account email">
+            <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+            <button id="login-button" type="submit" disabled>Sign in</button>
+          </form>
+          <p id="setup-message" class="small muted">Loading Firebase…</p>
+        </div>
+        <div class="walkthrough"><p class="eyebrow">YOUR WALKTHROUGH</p><ol><li><strong>Verify your identity</strong><span>Firebase sign-in, followed by a local API session.</span></li><li><strong>Create a booking</strong><span>The server calculates the price and saves the quote.</span></li><li><strong>Confirm the payment</strong><span>The fake gateway responds; the worker verifies the result.</span></li><li><strong>Check delivery</strong><span>Email and push are sent from durable background work.</span></li></ol></div>
+      </section>
+
+      <div id="signed-in" hidden>
+        <section id="booking-section">
+          <div class="section-heading"><div><p class="eyebrow">01 / BOOKINGS</p><h2>Create and follow a booking</h2></div><button id="refresh" class="secondary">Refresh status</button></div>
+          <form id="booking-form" class="panel booking-form">
+            <div><label for="service-date">Service date</label><input id="service-date" type="date" required></div>
+            <div><label for="voucher">Voucher <span class="muted">optional</span></label><input id="voucher" autocomplete="off" placeholder="Enter a voucher code"></div>
+            <div class="form-action"><button type="submit">Create booking</button></div>
+            <p class="small muted">Amounts are calculated by the server in SAR. A checkout does not confirm payment.</p>
+          </form>
+          <div class="booking-grid">
+            <div class="panel booking-list"><div class="panel-title"><h3>Recent bookings</h3><span id="booking-count" class="count">0</span></div><div id="bookings"><p class="empty">No bookings yet. Create your first booking above.</p></div></div>
+            <div class="panel detail-panel" id="booking-detail"><div class="empty-detail"><span class="empty-mark">01</span><h3>Your booking journey</h3><p class="muted">Select a booking to view its price, checkout and verified payment status.</p></div></div>
+          </div>
+        </section>
+
+        <section id="notification-section">
+          <div class="section-heading"><div><p class="eyebrow">02 / DELIVERY</p><h2>Confirm that the message arrived</h2></div><span class="badge neutral">Outbox delivery</span></div>
+          <div class="notification-grid">
+            <div class="panel"><h3>Browser push</h3><p class="muted">Enable notifications before simulating payment. Registration and actual receipt are shown separately.</p><label for="locale">Notification language</label><select id="locale"><option value="en">English</option><option value="ar">Arabic</option></select><button id="enable-push" class="secondary">Enable browser push</button><p id="push-status" class="small muted">Not registered in this session.</p><ol id="push-messages" class="message-list" aria-live="polite"></ol></div>
+            <div class="panel"><h3>Email delivery</h3><p class="muted">Email destinations are configured privately on the server. After setup, check your Resend-account inbox following a fresh verified payment.</p><div class="note"><strong>Check actual receipt</strong><p>Booking Paid means capture was verified. It does not prove the email reached your inbox. Check the inbox and provider delivery dashboard.</p></div><p class="small muted">Email addresses and provider credentials are not exposed by this page.</p></div>
+          </div>
+        </section>
+
+        <section id="operations-section" hidden>
+          <div class="section-heading"><div><p class="eyebrow">03 / OPERATIONS</p><h2>Payments and recovery</h2></div><button id="load-operations" class="secondary">Load operations</button></div>
+          <div class="panel"><h3>Captured payments</h3><div id="payments-table" class="table-wrap"><p class="muted">Load the current ledger.</p></div></div>
+          <div class="notification-grid"><div class="panel"><h3>Reconciliation</h3><div id="reports"><p class="muted">No report loaded.</p></div></div><div class="panel"><h3>Jobs needing attention</h3><div id="dead-letters"><p class="muted">No job data loaded.</p></div></div></div>
+        </section>
+
+        <section class="activity-section"><div class="section-heading"><h2>What happened</h2><span class="small muted">This browser session</span></div><ol id="activity" class="activity-list" aria-live="polite"></ol></section>
+      </div>
+      <footer>Database guarantees behind a simple interface.<span>Local demonstration · No real charges</span></footer>
+    </main>
+  </div>
+</body>
+</html>

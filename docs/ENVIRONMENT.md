@@ -127,3 +127,18 @@ Private account/recipient mappings can be supplied as hierarchical environment c
 | DEMO_EMAIL_RECIPIENT | Temporary process environment used by configure-demo-email.ps1 to supply one trusted recipient mapping through its ignored Compose override. It is not an identity key. |
 
 The helper temporarily supplies EMAIL_API_KEY/EMAIL_FROM and preserves Firebase settings while recreating the API. It restores the calling process environment afterward and does not persist the Resend key in its generated override. Repeat the helper when recreating the email-enabled stack. The browser receiver's ignored .env.push-demo.json stores only apiKey, projectId, messagingSenderId, appId and the public VAPID key; it must never contain Admin credentials, backend session tokens or the email provider key. These are local receiver settings rather than server environment variables. See NOTIFICATION_DEMO.md.
+
+## Guided local frontend
+
+| Name | Purpose |
+|---|---|
+| Demo__Enabled | Enables local demo routes/UI only when the environment is also exactly Demo. Defaults off. |
+| ASPNETCORE_ENVIRONMENT | Existing runtime environment setting; the local UI helper explicitly selects Demo. Production keeps UI/simulation disabled. |
+| Demo__WebApiKey | Public Firebase Web app API key supplied to the browser, never the service-account private key. |
+| Demo__MessagingSenderId | Public Firebase project messaging sender number. |
+| Demo__WebAppId | Public Firebase Web app identifier. |
+| Demo__VapidPublicKey | Public Web Push certificate key; optional until push is configured. |
+| LABAIK_DEMO_SETTING_<number> | Temporary environment variables used by start-demo-ui.ps1 to preserve current server settings without writing private values into its ignored Compose override. Restored after startup. |
+| PLAYWRIGHT_BROWSER_CHANNEL | Developer-only browser channel selection for check-demo-ui.cjs; not an application setting. |
+
+The helper's .env.demo-ui.public.json contains only public client configuration and is ignored. The generated .env.demo-ui.compose.json stores environment references, not private server credentials. Start the frontend through the helper so existing email mappings survive recreation. Same-origin local hosting requires no permissive CORS policy. See FRONTEND_DEMO.md.
