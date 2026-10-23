@@ -6,6 +6,7 @@ public sealed class GatewayDbContext(DbContextOptions<GatewayDbContext> options)
 {
     public DbSet<GatewayCheckout> Checkouts => Set<GatewayCheckout>();
     public DbSet<GatewayCharge> Charges => Set<GatewayCharge>();
+    public DbSet<GatewayRefund> Refunds => Set<GatewayRefund>();
     public DbSet<GatewayEvent> Events => Set<GatewayEvent>();
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -27,6 +28,12 @@ public sealed class GatewayDbContext(DbContextOptions<GatewayDbContext> options)
         charges.HasIndex(x => x.BookingId).IsUnique().HasDatabaseName("UX_GatewayCharges_Booking");
         charges.HasIndex(x => x.CheckoutId).IsUnique().HasDatabaseName("UX_GatewayCharges_Checkout");
         charges.HasOne<GatewayCheckout>().WithMany().HasForeignKey(x => x.CheckoutId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_GatewayCharges_Checkout");
+        var refunds = model.Entity<GatewayRefund>();
+        refunds.ToTable("Refunds", t => t.HasCheckConstraint("CK_GatewayRefunds_Money", "\"AmountMinor\" > 0 AND \"Currency\"='SAR'"));
+        refunds.HasKey(x => x.Id).HasName("PK_GatewayRefunds");
+        refunds.HasIndex(x => x.Key).IsUnique().HasDatabaseName("UX_GatewayRefunds_Key");
+        refunds.HasIndex(x => x.TransactionId).IsUnique().HasDatabaseName("UX_GatewayRefunds_Charge");
+        refunds.HasOne<GatewayCharge>().WithMany().HasForeignKey(x => x.TransactionId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_GatewayRefunds_Charge");
         var events = model.Entity<GatewayEvent>();
         events.ToTable("Events", t =>
         {

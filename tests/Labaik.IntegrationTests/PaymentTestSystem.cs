@@ -59,7 +59,7 @@ public sealed class PaymentDatabase : IAsyncLifetime
     public async Task ResetAsync()
     {
         await using var admin = App(true);
-        await admin.Database.ExecuteSqlRawAsync("DROP TRIGGER IF EXISTS reject_payment_outbox ON app.\"OutboxMessages\"; DROP FUNCTION IF EXISTS test_support.reject_outbox(); TRUNCATE app.\"JobRuns\",app.\"OutboxMessages\",app.\"CapturedPayments\",app.\"PaymentAttempts\",app.\"WebhookInbox\",app.\"Bookings\",app.\"Users\",fake_gateway.\"Events\",fake_gateway.\"Charges\",fake_gateway.\"Checkouts\",test_support.receipts CASCADE");
+        await admin.Database.ExecuteSqlRawAsync("DROP TRIGGER IF EXISTS reject_payment_outbox ON app.\"OutboxMessages\"; DROP FUNCTION IF EXISTS test_support.reject_outbox(); TRUNCATE app.\"DailyCapacities\",app.\"JobRuns\",app.\"OutboxMessages\",app.\"CapturedPayments\",app.\"PaymentAttempts\",app.\"WebhookInbox\",app.\"Bookings\",app.\"Users\",fake_gateway.\"Events\",fake_gateway.\"Charges\",fake_gateway.\"Checkouts\",test_support.receipts CASCADE");
     }
     public async Task<(Guid BookingId, Guid OwnerId)> SeedAsync()
     {
@@ -127,6 +127,7 @@ public sealed class PaymentTestSystem : IAsyncDisposable
         IPaymentGateway gatewayClient = new HttpPaymentGateway(GatewayClient);
         services.AddSingleton(decorate?.Invoke(gatewayClient) ?? gatewayClient);
         services.AddSingleton<IPaymentEventPublisher>(new HttpPaymentEventPublisher(receiverClient));
+        services.AddSingleton(new BookingPolicy()); services.AddScoped<BookingMoney>(); services.AddScoped<BookingService>();
         services.AddScoped<PaymentCheckout>(); services.AddScoped<PaymentIngress>(); services.AddScoped<WorkQueue>(); services.AddScoped<PaymentPump>();
         Services = services.BuildServiceProvider();
         _ingressHost = new HostBuilder().ConfigureWebHost(web => web.UseTestServer().Configure(app => app.Run(async context =>

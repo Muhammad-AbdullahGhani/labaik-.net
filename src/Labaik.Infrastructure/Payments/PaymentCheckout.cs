@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Labaik.Infrastructure.Payments;
 
 public sealed record CheckoutAttemptView(Guid Id, Guid? CheckoutId, AttemptStatus Status);
-public sealed class PaymentCheckout(AppDbContext db, IPaymentGateway gateway)
+public sealed class PaymentCheckout(AppDbContext db, IPaymentGateway gateway, BookingMoney money)
 {
     public async Task<CheckoutAttemptView> CheckoutAsync(Guid bookingId, Guid actorId, string requestKey, CancellationToken ct = default)
     {
@@ -34,6 +34,7 @@ public sealed class PaymentCheckout(AppDbContext db, IPaymentGateway gateway)
                     if (!transition.IsSuccess) throw new PaymentConflictException(transition.Reason!);
                 }
                 if (booking.State != BookingState.PendingPayment) throw new PaymentConflictException("Booking cannot be checked out.");
+                await money.ReserveVoucherAsync(booking, await db.Database.SqlQuery<DateTimeOffset>($"SELECT clock_timestamp() AS \"Value\"").SingleAsync(ct), ct);
                 var id = Guid.NewGuid();
                 attempt = new PaymentAttempt { Id = id, BookingId = bookingId, RequestKey = requestKey, RequestHash = hash,
                     GatewayKey = $"checkout:{id:N}", AmountMinor = booking.TotalMinor, Currency = booking.Currency,

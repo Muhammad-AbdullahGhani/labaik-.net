@@ -3,7 +3,7 @@ namespace Labaik.Infrastructure.Payments;
 public enum AttemptStatus { Creating, Pending, Unknown, Succeeded, Failed }
 public enum InboxStatus { Pending, Processed, Rejected }
 public enum WorkStatus { Pending, Processing, Completed, DeadLetter }
-public enum WorkKind { RecoverCheckout, Inbox, Outbox }
+public enum WorkKind { RecoverCheckout, Inbox, Outbox, Refund }
 public sealed class PaymentAttempt
 {
     public Guid Id { get; set; }
@@ -62,4 +62,14 @@ public sealed class JobRun
     public DateTimeOffset? LeaseUntil { get; set; }
     public long ClaimVersion { get; set; }
     public string? LastError { get; set; }
+}
+
+public sealed class RefundRequest
+{
+    public Guid Id { get; set; }
+    public Guid CapturedPaymentId { get; set; }
+    public string GatewayKey { get; set; } = null!;
+    public string Reason { get; set; } = null!;
+    public string Status { get; set; } = "Pending";
+    public Guid? GatewayRefundId { get; set; }
 }

@@ -12,8 +12,15 @@ public static class PaymentHosting
     public static IServiceCollection AddPaymentCore(this IServiceCollection services, IConfiguration config)
     {
         services.AddSingleton(new WorkPolicy());
-        services.AddSingleton(_ => new WebhookCodec(Convert.FromBase64String(config["Payments:WebhookEncryptionKey"] ?? ""),
-            Convert.FromBase64String(config["Payments:WebhookSignatureKey"] ?? "")));
+        services.AddSingleton(new BookingPolicy { BaseMinor = config.GetValue("Booking:BaseMinor", 10000L), DailyLimit = config.GetValue("Booking:DailyLimit", 50),
+            DateAddons = (config.GetSection("Booking:DateAddons").Get<Dictionary<string,long>>() ?? new()).ToDictionary(x => DateOnly.ParseExact(x.Key, "yyyy-MM-dd"), x => x.Value) });
+        services.AddScoped<BookingMoney>(); services.AddScoped<BookingService>();
+        services.AddSingleton(_ =>
+        {
+            try { return new WebhookCodec(Convert.FromBase64String(config["Payments:WebhookEncryptionKey"] ?? ""), Convert.FromBase64String(config["Payments:WebhookSignatureKey"] ?? "")); }
+            catch (ArgumentException) { throw new PaymentDependencyException(); }
+            catch (FormatException) { throw new PaymentDependencyException(); }
+        });
         services.AddHttpClient<IPaymentGateway, HttpPaymentGateway>(client =>
         {
             client.BaseAddress = new Uri(config["Payments:GatewayUrl"] ?? throw new PaymentDependencyException());

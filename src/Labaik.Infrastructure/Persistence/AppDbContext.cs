@@ -20,6 +20,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<CapturedPayment> CapturedPayments => Set<CapturedPayment>();
     public DbSet<WebhookInbox> WebhookInbox => Set<WebhookInbox>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<RefundRequest> RefundRequests => Set<RefundRequest>();
     public DbSet<JobRun> JobRuns => Set<JobRun>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

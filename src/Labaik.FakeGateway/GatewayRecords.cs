@@ -37,7 +37,17 @@ public sealed class GatewaySimulation
     public int QueryDelayMs { get; set; }
     public int PayResponseDelayMs { get; set; }
     public bool FailCreateResponse { get; set; }
+    public bool FailRefundResponse { get; set; }
     public bool FailPayResponse { get; set; }
     public bool QueryUnavailable { get; set; }
     public int DeliveryCopies { get; set; } = 1;
+}
+
+public sealed class GatewayRefund
+{
+    public Guid Id { get; set; }
+    public Guid TransactionId { get; set; }
+    public string Key { get; set; } = null!;
+    public long AmountMinor { get; set; }
+    public string Currency { get; set; } = "SAR";
 }

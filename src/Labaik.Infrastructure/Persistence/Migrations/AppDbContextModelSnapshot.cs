@@ -507,7 +507,7 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_JobRuns_Counters", "\"Attempts\" >= 0 AND \"ClaimVersion\" >= 0");
 
-                            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox')");
+                            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox','Refund')");
 
                             t.HasCheckConstraint("CK_JobRuns_Lease", "\"Status\" <> 'Processing' OR (\"LeaseOwner\" IS NOT NULL AND \"LeaseUntil\" IS NOT NULL)");
 
@@ -627,6 +627,51 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_PaymentAttempts_Sequence", "\"Sequence\" > 0");
 
                             t.HasCheckConstraint("CK_PaymentAttempts_Status", "\"Status\" IN ('Creating','Pending','Unknown','Succeeded','Failed')");
+                        });
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Payments.RefundRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CapturedPaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("GatewayKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("GatewayRefundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id")
+                        .HasName("PK_RefundRequests");
+
+                    b.HasIndex("CapturedPaymentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Refunds_Capture");
+
+                    b.HasIndex("GatewayKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Refunds_Key");
+
+                    b.HasIndex("GatewayRefundId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Refunds_ProviderId");
+
+                    b.ToTable("RefundRequests", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_Refunds_Status", "\"Status\" IN ('Pending','Succeeded')");
                         });
                 });
 
@@ -784,6 +829,16 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_Attempts_Bookings");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Payments.RefundRequest", b =>
+                {
+                    b.HasOne("Labaik.Infrastructure.Payments.CapturedPayment", null)
+                        .WithMany()
+                        .HasForeignKey("CapturedPaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Refunds_Captures");
                 });
 #pragma warning restore 612, 618
         }

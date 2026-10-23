@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Labaik.Infrastructure.Payments;
 
-public sealed class PaymentPump(AppDbContext db, WorkQueue queue, IPaymentGateway gateway, WebhookCodec codec, IPaymentEventPublisher publisher)
+public sealed class PaymentPump(AppDbContext db, WorkQueue queue, IPaymentGateway gateway, WebhookCodec codec, IPaymentEventPublisher publisher, BookingMoney money)
 {
     public async Task<bool> RunOnceAsync(WorkKind? kind = null, CancellationToken ct = default)
     {
@@ -14,7 +14,8 @@ public sealed class PaymentPump(AppDbContext db, WorkQueue queue, IPaymentGatewa
         if (claim is null) return false;
         try
         {
-            if (claim.Kind == WorkKind.Outbox) await PublishAsync(claim, ct);
+            if (claim.Kind == WorkKind.Refund) await RefundAsync(claim, ct);
+            else if (claim.Kind == WorkKind.Outbox) await PublishAsync(claim, ct);
             else await VerifyAsync(claim, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
@@ -92,25 +93,53 @@ public sealed class PaymentPump(AppDbContext db, WorkQueue queue, IPaymentGatewa
                 attempt.Status = AttemptStatus.Succeeded;
                 if (booking.State == BookingState.PendingPayment)
                 {
-                    var transition = booking.TryTransition(BookingState.Paid, ActorRole.System);
-                    if (!transition.IsSuccess) throw new PaymentConflictException(transition.Reason!);
-                    await AddOutbox(booking.Id, "BookingPaid", $"paid:{booking.Id:N}", new { PaymentId = capture.Id }, now, ct);
+                    if (await money.AllocateAsync(booking, ct))
+                    {
+                        var transition = booking.TryTransition(BookingState.Paid, ActorRole.System);
+                        if (!transition.IsSuccess) throw new PaymentConflictException(transition.Reason!);
+                        await money.ConsumeVoucherAsync(booking, ct);
+                        await AddOutbox(booking.Id, "BookingPaid", $"paid:{booking.Id:N}", new { PaymentId = capture.Id }, now, ct);
+                    }
+                    else
+                    {
+                        _ = booking.Cancel("DateFull", ActorRole.System);
+                        await money.ReleaseVoucherAsync(booking, now, ct);
+                    }
                 }
-                else if (booking.State == BookingState.Cancelled)
+                if (booking.State == BookingState.Cancelled)
                 {
-                    // Step 4 will consume this durable compensation intent; never resurrect a cancelled booking.
+                    await money.RequestRefundAsync(capture, booking.CancellationReason ?? "LatePayment", now, ct);
                     await AddOutbox(booking.Id, "RefundRequired", $"refund-required:{capture.Id:N}", new { PaymentId = capture.Id }, now, ct);
                     await AddOutbox(booking.Id, "AccountantAlert", $"late-payment:{capture.Id:N}", new { PaymentId = capture.Id }, now, ct);
                 }
             }
             else if (attempt.Status is not (AttemptStatus.Succeeded or AttemptStatus.Failed))
+            {
                 attempt.Status = snapshot.Status == "Failed" ? AttemptStatus.Failed : AttemptStatus.Pending;
+                if (attempt.Status == AttemptStatus.Failed) await money.ReleaseVoucherAsync(booking, now, ct);
+            }
             if (received is not null) received.Status = InboxStatus.Processed;
             if (claim.Kind == WorkKind.RecoverCheckout && attempt.Status is not (AttemptStatus.Succeeded or AttemptStatus.Failed))
                 queue.Retry(job, now, "AwaitingPayment", false);
             else WorkQueue.Complete(job);
         }
         // Capture, booking version/state, outbox intents and inbox acknowledgement are all-or-nothing.
+        await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+    }
+    private async Task RefundAsync(WorkClaim claim, CancellationToken ct)
+    {
+        var request = await db.RefundRequests.AsNoTracking().SingleAsync(x => x.Id == claim.EntityId, ct);
+        var capture = await db.CapturedPayments.AsNoTracking().SingleAsync(x => x.Id == request.CapturedPaymentId, ct);
+        var result = await gateway.RefundAsync(capture.GatewayTransactionId, request.GatewayKey, capture.AmountMinor, capture.Currency, ct);
+        if (result.Status != "Succeeded" || result.RefundId == Guid.Empty || result.TransactionId != capture.GatewayTransactionId || result.Key != request.GatewayKey || result.AmountMinor != capture.AmountMinor || result.Currency != capture.Currency)
+            throw new PaymentDependencyException();
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var job = await queue.LockAsync(claim, ct); if (job is null) return;
+        var booking = await db.Bookings.FromSqlInterpolated($"SELECT * FROM app.\"Bookings\" WHERE \"Id\"={capture.BookingId} FOR UPDATE").SingleAsync(ct);
+        var refund = await db.RefundRequests.SingleAsync(x => x.Id == request.Id, ct);
+        refund.Status = "Succeeded"; refund.GatewayRefundId = result.RefundId;
+        if (booking.State == BookingState.Cancelled) _ = booking.TryTransition(BookingState.Refunded, ActorRole.System);
+        await money.ReleaseVoucherAsync(booking, await queue.Now(ct), ct); WorkQueue.Complete(job);
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
     }
     private async Task AddOutbox(Guid bookingId, string type, string key, object payload, DateTimeOffset now, CancellationToken ct)

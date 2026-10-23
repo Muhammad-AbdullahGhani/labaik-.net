@@ -53,6 +53,7 @@ public static class PaymentWebhookEndpoint
             var accepted = await context.RequestServices.GetRequiredService<PaymentIngress>().ReceiveAsync(body.ToArray(), signature, context.RequestAborted);
             context.Response.StatusCode = accepted ? 202 : 409;
         }
+        catch (Application.Payments.PaymentDependencyException) { context.Response.StatusCode = 503; }
         catch (CryptographicException) { context.Response.StatusCode = 401; }
         catch (JsonException) { context.Response.StatusCode = 400; }
     }

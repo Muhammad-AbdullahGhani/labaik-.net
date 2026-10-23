@@ -28,7 +28,7 @@ internal static class GatewayEndpoints
     {
         app.Use(async (context, next) =>
         {
-            if (context.Request.Path.StartsWithSegments("/checkouts"))
+            if ((context.Request.Path.StartsWithSegments("/checkouts") || context.Request.Path.StartsWithSegments("/refunds")))
             {
                 var expected = app.Configuration["Gateway:ApiKey"];
                 if (expected is not { Length: >= 32 }) { context.Response.StatusCode = 503; return; }
@@ -38,6 +38,8 @@ internal static class GatewayEndpoints
             }
             await next(context);
         });
+        app.MapPost("/refunds", async (RefundCommand command, GatewayService service, GatewaySimulation faults, HttpContext context) =>
+            await Handle(async () => { var result = await service.RefundAsync(command, context.RequestAborted); return faults.FailRefundResponse ? Results.StatusCode(503) : Results.Ok(result); }));
         app.MapPost("/checkouts", async (CheckoutCommand command, GatewayService service, GatewaySimulation faults, HttpContext context) =>
             await Handle(async () =>
             {

@@ -16,6 +16,12 @@ public sealed class HttpPaymentGateway(HttpClient client) : IPaymentGateway
         try { using var response = await client.GetAsync($"checkouts/{checkoutId}", ct); return await Read(response, ct); }
         catch (Exception error) when (error is HttpRequestException or JsonException) { throw new PaymentDependencyException(); }
     }
+    public async Task<RefundSnapshot> RefundAsync(Guid transactionId, string key, long amountMinor, string currency, CancellationToken ct)
+    {
+        using var response = await client.PostAsJsonAsync("refunds", new RefundCommand(transactionId, key, amountMinor, currency), ct);
+        if (!response.IsSuccessStatusCode) throw new PaymentDependencyException();
+        return await response.Content.ReadFromJsonAsync<RefundSnapshot>(ct) ?? throw new PaymentDependencyException();
+    }
     private static async Task<GatewaySnapshot> Read(HttpResponseMessage response, CancellationToken ct)
     {
         if (!response.IsSuccessStatusCode) throw new PaymentDependencyException();

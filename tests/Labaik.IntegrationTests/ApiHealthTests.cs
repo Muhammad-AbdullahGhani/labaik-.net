@@ -10,7 +10,7 @@ public sealed class ApiHealthTests
     [Theory]
     [InlineData("/health/live", HttpStatusCode.OK)]
     [InlineData("/health/ready", HttpStatusCode.ServiceUnavailable)]
-    [InlineData("/bookings", HttpStatusCode.NotFound)]
+    [InlineData("/bookings", HttpStatusCode.MethodNotAllowed)]
     public async Task Health_only_service_works_without_a_database(string path, HttpStatusCode expected)
     {
         await using var factory = new WebApplicationFactory<ApiProgram>().WithWebHostBuilder(builder =>

@@ -11,6 +11,9 @@ public sealed class VoucherRedemption
     public RedemptionStatus Status { get; private set; } = RedemptionStatus.Reserved;
     public DateTimeOffset ReservedAt { get; private set; }
     public DateTimeOffset? ReleasedAt { get; private set; }
+    public void Consume() { if (Status == RedemptionStatus.Reserved) Status = RedemptionStatus.Consumed; }
+    public void Release(DateTimeOffset now) { Status = RedemptionStatus.Released; ReleasedAt = now; }
+    public void Reserve(DateTimeOffset now) { Status = RedemptionStatus.Reserved; ReservedAt = now; ReleasedAt = null; }
     private VoucherRedemption() { }
     public VoucherRedemption(Guid id, Booking booking, DateTimeOffset reservedAt)
     {

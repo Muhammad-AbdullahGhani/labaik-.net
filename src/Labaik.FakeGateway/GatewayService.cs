@@ -57,6 +57,19 @@ public sealed class GatewayService(GatewayDbContext db, WebhookCodec codec)
         await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         return Snapshot(checkout);
     }
+    public async Task<RefundSnapshot> RefundAsync(RefundCommand command, CancellationToken ct)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var charge = await db.Charges.FromSqlInterpolated($"SELECT * FROM fake_gateway.\"Charges\" WHERE \"Id\"={command.TransactionId} FOR UPDATE").SingleOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException();
+        if (command.AmountMinor != charge.AmountMinor || command.Currency != charge.Currency || string.IsNullOrWhiteSpace(command.Key))
+            throw new PaymentConflictException("Refund must match the complete original charge.");
+        var refund = await db.Refunds.SingleOrDefaultAsync(x => x.TransactionId == charge.Id, ct);
+        if (refund is not null && refund.Key != command.Key) throw new PaymentConflictException("Charge already refunded under another key.");
+        if (refund is null) { refund = new GatewayRefund { Id = Guid.NewGuid(), TransactionId = charge.Id, Key = command.Key, AmountMinor = charge.AmountMinor, Currency = charge.Currency }; db.Refunds.Add(refund); }
+        await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
+        return new(refund.Id, refund.TransactionId, refund.Key, refund.AmountMinor, refund.Currency, "Succeeded");
+    }
     private async Task AddEvent(GatewayCheckout checkout, CancellationToken ct)
     {
         var id = Guid.NewGuid();

@@ -325,7 +325,7 @@ public sealed class PaymentIntegrationTests(PaymentDatabase database) : IClassFi
         await using var gateway = database.Gateway(); Assert.Equal(0, await gateway.Checkouts.CountAsync());
     }
     [Fact]
-    public async Task Changed_checkout_payload_and_other_owners_conflict_and_production_routes_stay_disabled()
+    public async Task Changed_checkout_payload_and_other_owners_conflict_and_production_routes_are_protected()
     {
         await using var system = new PaymentTestSystem(database); var seed = await database.SeedAsync();
         await Assert.ThrowsAsync<PaymentConflictException>(() => system.Checkout(seed.BookingId, Guid.NewGuid(), "owner"));
@@ -341,6 +341,6 @@ public sealed class PaymentIntegrationTests(PaymentDatabase database) : IClassFi
         await using var api = new WebApplicationFactory<ApiProgram>().WithWebHostBuilder(b => b.UseSetting("ConnectionStrings:Database", database.AppConnection));
         using var client = api.CreateClient();
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/payments/checkout", new { bookingId = seed.BookingId })).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/webhooks/gateway", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/webhooks/gateway", new { })).StatusCode);
     }
 }

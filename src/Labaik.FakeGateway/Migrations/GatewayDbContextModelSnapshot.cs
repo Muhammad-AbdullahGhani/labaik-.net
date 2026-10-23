@@ -157,6 +157,43 @@ namespace Labaik.FakeGateway.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Labaik.FakeGateway.GatewayRefund", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TransactionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_GatewayRefunds");
+
+                    b.HasIndex("Key")
+                        .IsUnique()
+                        .HasDatabaseName("UX_GatewayRefunds_Key");
+
+                    b.HasIndex("TransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_GatewayRefunds_Charge");
+
+                    b.ToTable("Refunds", "fake_gateway", t =>
+                        {
+                            t.HasCheckConstraint("CK_GatewayRefunds_Money", "\"AmountMinor\" > 0 AND \"Currency\"='SAR'");
+                        });
+                });
+
             modelBuilder.Entity("Labaik.FakeGateway.GatewayCharge", b =>
                 {
                     b.HasOne("Labaik.FakeGateway.GatewayCheckout", null)
@@ -175,6 +212,16 @@ namespace Labaik.FakeGateway.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_GatewayEvents_Checkout");
+                });
+
+            modelBuilder.Entity("Labaik.FakeGateway.GatewayRefund", b =>
+                {
+                    b.HasOne("Labaik.FakeGateway.GatewayCharge", null)
+                        .WithMany()
+                        .HasForeignKey("TransactionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_GatewayRefunds_Charge");
                 });
 #pragma warning restore 612, 618
         }

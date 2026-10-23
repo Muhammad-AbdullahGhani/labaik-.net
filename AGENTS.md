@@ -4,7 +4,7 @@
 
 - Labaik Core is the .NET 10 / PostgreSQL backend defined in docs/ASSIGNMENT.md. This is not an Expo or Firestore application.
 - Read docs/ASSIGNMENT.md, this file, and docs/PLAN.md before implementation. User instructions take precedence over proposals in the plan.
-- Current authorization: step 3 checkout/capture only, with commit feat: recover and verify idempotent payments. Public Core sale/capture/callback routes remain disabled until step 4. Run only new payment tests plus a build this turn, as explicitly requested; do not run the full regression suite. Maintain docs/DEMO_PREP.md in easy language. Stop before step 4.
+- Current authorization: complete lean steps 4 through 7 within the user-approved two-hour timebox. Prioritize money/concurrency, focused tests per step and one final full regression run. Keep one commit per step, maintain easy-language DEMO_PREP.md, and honestly document incomplete/unverified integrations. No optional dashboard/XLSX polish or paid hosting.
 - Use Domain / Application / Infrastructure / Api boundaries and a separate fake gateway HTTP project. Gateway data lives in its own schema in the same PostgreSQL database; no shared transactions across the HTTP boundary.
 
 ## Interview-grade rules

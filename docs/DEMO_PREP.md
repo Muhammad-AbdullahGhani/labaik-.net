@@ -151,3 +151,9 @@ Tests create an isolated PostgreSQL container with generated data and remove it 
 **How do retries stop?** "Provider failures back off and eventually leave a visible dead-letter job. A normal still-pending payment is not counted as a provider error, and it never causes me to open a new charge attempt."
 
 **Which files should I open?** PaymentCheckout.cs for intent/idempotency, GatewayService.cs for the provider contract, WebhookCodec.cs for message protection, PaymentPump.cs for the commit, WorkQueue.cs for claims, and PaymentIntegrationTests.cs for proof. Generated migrations/snapshots record the EF schema; explain the named checks/indexes rather than reading generated boilerplate aloud.
+
+## Step 4 demo update
+
+"The date has a counter that the database can increment only while it is below the limit. Capture and booking allocation commit together. A payment arriving for a full date is recorded and refunded, rather than silently accepted."
+
+Actual focused result: 200 paid attempts -> 50 fulfilled booking slots and 150 confirmed full refunds. Five new tests passed, including voucher limits and cancellation races. Public booking/callback routes are now protected and available; automatic processing needs configured gateway keys and worker activation. Earlier disabled-route notes describe historical step 3, not the current stage.

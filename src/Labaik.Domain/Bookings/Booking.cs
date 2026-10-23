@@ -28,6 +28,14 @@ public sealed class Booking
         BaseMinor = quote.BaseFee.Minor; AddonMinor = quote.Addon.Minor; DiscountMinor = quote.Discount.Minor;
         TotalMinor = quote.Total.Minor; VoucherId = quote.VoucherId;
     }
+    public void AllocateCapacity() => CapacityAllocated = true;
+    public void ReleaseCapacity(DateTimeOffset now) { CapacityAllocated = false; AllocationReleasedAt = now; }
+    public RuleResult Cancel(string reason, ActorRole role)
+    {
+        var result = TryTransition(BookingState.Cancelled, role);
+        if (result.IsSuccess) CancellationReason = reason;
+        return result;
+    }
     public RuleResult TryTransition(BookingState target, ActorRole role)
     {
         var result = BookingStateMachine.Evaluate(State, target, role);

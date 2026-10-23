@@ -49,12 +49,19 @@ internal static class PaymentModel
         outbox.Property(x => x.Type).HasMaxLength(64).IsRequired();
         outbox.HasIndex(x => x.DedupKey).IsUnique().HasDatabaseName("UX_Outbox_DedupKey");
         outbox.HasOne<Booking>().WithMany().HasForeignKey(x => x.BookingId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Outbox_Bookings");
+        var refunds = model.Entity<RefundRequest>();
+        refunds.ToTable("RefundRequests", t => t.HasCheckConstraint("CK_Refunds_Status", "\"Status\" IN ('Pending','Succeeded')"));
+        refunds.HasKey(x => x.Id).HasName("PK_RefundRequests");
+        refunds.HasIndex(x => x.CapturedPaymentId).IsUnique().HasDatabaseName("UX_Refunds_Capture");
+        refunds.HasIndex(x => x.GatewayKey).IsUnique().HasDatabaseName("UX_Refunds_Key");
+        refunds.HasIndex(x => x.GatewayRefundId).IsUnique().HasDatabaseName("UX_Refunds_ProviderId");
+        refunds.HasOne<CapturedPayment>().WithMany().HasForeignKey(x => x.CapturedPaymentId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Refunds_Captures");
         var jobs = model.Entity<JobRun>();
         jobs.ToTable("JobRuns", t =>
         {
             t.HasCheckConstraint("CK_JobRuns_State", "\"Status\" IN ('Pending','Processing','Completed','DeadLetter')");
             t.HasCheckConstraint("CK_JobRuns_Counters", "\"Attempts\" >= 0 AND \"ClaimVersion\" >= 0");
-            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox')");
+            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox','Refund')");
             t.HasCheckConstraint("CK_JobRuns_Lease", "\"Status\" <> 'Processing' OR (\"LeaseOwner\" IS NOT NULL AND \"LeaseUntil\" IS NOT NULL)");
         });
         jobs.HasKey(x => x.Id).HasName("PK_JobRuns");

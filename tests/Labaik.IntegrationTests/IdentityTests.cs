@@ -149,7 +149,7 @@ public sealed class IdentityTests(CoreDatabase database) : IClassFixture<CoreDat
         await using var db = database.CreateContext();
         Assert.Equal(2, await db.Users.CountAsync(x => x.FirebaseUid == staffUid || x.FirebaseUid == customerUid));
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/auth/provision", new { role = "Admin" })).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/bookings")).StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await client.GetAsync("/bookings")).StatusCode);
     }
     [Theory]
     [InlineData("wrong-project")]

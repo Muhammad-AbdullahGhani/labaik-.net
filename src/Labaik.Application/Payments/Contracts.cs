@@ -8,6 +8,8 @@ public sealed record PaymentNotice(Guid EventId, Guid CheckoutId, Guid BookingId
 public interface IPaymentGateway
 {
     Task<GatewaySnapshot> CreateAsync(CheckoutCommand command, CancellationToken ct);
+    Task<RefundSnapshot> RefundAsync(Guid transactionId, string key, long amountMinor, string currency, CancellationToken ct)
+        => throw new PaymentDependencyException();
     Task<GatewaySnapshot> QueryAsync(Guid checkoutId, CancellationToken ct);
 }
 public sealed record PaymentEvent(Guid Id, Guid BookingId, string Type, string Payload);
@@ -17,3 +19,6 @@ public interface IPaymentEventPublisher
 }
 public sealed class PaymentConflictException(string reason) : Exception(reason);
 public sealed class PaymentDependencyException : Exception;
+
+public sealed record RefundCommand(Guid TransactionId, string Key, long AmountMinor, string Currency);
+public sealed record RefundSnapshot(Guid RefundId, Guid TransactionId, string Key, long AmountMinor, string Currency, string Status);
