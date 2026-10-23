@@ -24,6 +24,7 @@ public static class ServiceHost
         builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.None);
         builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
         builder.Logging.AddFilter("Npgsql", LogLevel.None);
+        builder.Logging.AddFilter("System.Net.Http.HttpClient", LogLevel.None);
         builder.Services.AddSingleton(services =>
         {
             var connectionString = services.GetRequiredService<IConfiguration>().GetConnectionString("Database");

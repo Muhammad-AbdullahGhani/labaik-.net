@@ -96,3 +96,17 @@ Added Application verifier contract, real SDK adapter and fake in tests; schema-
 ### Real validation
 
 Final full tests: 744 domain, 26 integration, 3 gateway, all passed; 0 failed/skipped. Real PostgreSQL tests include refresh concurrency/restart/replay/provisioning and schema/concurrency regressions. Six real Firebase SDK cases use generated certificates and controlled HTTP (no live credentials) to verify signature/project/expiry/revocation behavior. Build passed with 0 warnings/errors. Fixed initial compile mismatches against the current SDK (typed CredentialFactory instead of deprecated FromJson, actual AuthErrorCode names and HttpClientFactory type). Added strict post-verification Firebase expiry to remove SDK leeway for issuing fresh local sessions. Vulnerability scan clean. Live Firebase/managed hosting and GitHub/GHCR remain unverified. Post-identity Compose build/up passed with both migration jobs and four healthy HTTP probes; booking route 404, unconfigured Firebase exchange 503; down passed. Final constant-time retry-key comparison and two extra security tests passed in the final local run. No later scope is authorized.
+
+## Entry 007 - Step 3 payments and demo preparation
+
+### Prompts and accepted scope
+
+User asked to speed up and start step 3, then asked to continue. During work the user explicitly requested only the NEW test suite rather than rerunning the older tests, and asked for maintained demo preparation in easy language explaining the product, problems/fixes, decisions and presentation. Accepted those constraints; did not infer authorization for step 4 or a full regression run.
+
+### Proposed and implemented
+
+Implemented durable fake-gateway HTTP checkout/pay/query/redirect with shared API-key authentication, persistent idempotency and charge constraints, configurable response loss/latency/query outages/duplicate delivery. Added core intent/unknown recovery, signed AES-GCM callback inbox, authoritative gateway verification, atomic capture/Paid/outbox commits, and durable claim/lease/fencing/retry/dead-letter workers and HTTP publication. Customer/capture/callback routes and worker activation remain disabled in Core until capacity/refunds; late captures are retained with compensation/alert intents for step 4. Kept downstream event publication separate from actual email/push/assignment work. Added DEMO_PREP.md early and updated it with honest demo wording and limitations. No new package/delegation/polish work.
+
+### Real evidence and corrections
+
+Release build passed with 0 warnings/errors; 28 NEW payment integration cases passed, 0 failed/skipped, including the required 200-way checkout/charge race. Used PostgreSQL containers, restricted schema roles and separate HTTP hosts. Updated deprecated test host APIs to supported HostBuilder. Corrected callback base URL after first executed 24/25 run. Added protection/test against a delayed Pending observation reopening a finally Failed attempt. Tests verify response-loss/restart, duplicate/out-of-order callbacks, malformed/mismatched data, atomic rollback, provider re-query outage, worker fencing, duplicate publication and dead letters. Compose config and diff checks passed. Older suites, new Docker image run, external CI/GHCR and real providers were NOT rerun/verified. Commit requested by the approved plan: feat: recover and verify idempotent payments. No step 4 implementation authorized.

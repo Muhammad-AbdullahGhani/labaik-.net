@@ -400,6 +400,288 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Labaik.Infrastructure.Payments.CapturedPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("AttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CapturedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("GatewayTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_CapturedPayments");
+
+                    b.HasIndex("AttemptId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Captures_Attempt");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Captures_Booking");
+
+                    b.HasIndex("GatewayTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Captures_Transaction");
+
+                    b.ToTable("CapturedPayments", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_CapturedPayments_Money", "\"AmountMinor\" > 0 AND \"Currency\"='SAR'");
+                        });
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Payments.JobRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("AvailableAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("ClaimVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("JobName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("LeaseOwner")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ScheduledFor")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_JobRuns");
+
+                    b.HasIndex("JobName", "ScheduledFor")
+                        .IsUnique()
+                        .HasDatabaseName("UX_JobRuns_Schedule");
+
+                    b.HasIndex("Status", "AvailableAt", "LeaseUntil")
+                        .HasDatabaseName("IX_JobRuns_Due");
+
+                    b.ToTable("JobRuns", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_JobRuns_Counters", "\"Attempts\" >= 0 AND \"ClaimVersion\" >= 0");
+
+                            t.HasCheckConstraint("CK_JobRuns_Kind", "\"Kind\" IN ('RecoverCheckout','Inbox','Outbox')");
+
+                            t.HasCheckConstraint("CK_JobRuns_Lease", "\"Status\" <> 'Processing' OR (\"LeaseOwner\" IS NOT NULL AND \"LeaseUntil\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_JobRuns_State", "\"Status\" IN ('Pending','Processing','Completed','DeadLetter')");
+                        });
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Payments.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DedupKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_OutboxMessages");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("DedupKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Outbox_DedupKey");
+
+                    b.ToTable("OutboxMessages", "app");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Payments.PaymentAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CheckoutId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("GatewayKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("RequestKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_PaymentAttempts");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Attempts_LiveBooking")
+                        .HasFilter("\"Status\" IN ('Creating','Pending','Unknown','Succeeded')");
+
+                    b.HasIndex("CheckoutId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Attempts_Checkout");
+
+                    b.HasIndex("GatewayKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Attempts_GatewayKey");
+
+                    b.HasIndex("BookingId", "RequestKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Attempts_RequestKey");
+
+                    b.HasIndex("BookingId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Attempts_Sequence");
+
+                    b.ToTable("PaymentAttempts", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_PaymentAttempts_Money", "\"AmountMinor\" > 0 AND \"Currency\"='SAR'");
+
+                            t.HasCheckConstraint("CK_PaymentAttempts_Sequence", "\"Sequence\" > 0");
+
+                            t.HasCheckConstraint("CK_PaymentAttempts_Status", "\"Status\" IN ('Creating','Pending','Unknown','Succeeded','Failed')");
+                        });
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Payments.WebhookInbox", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("EncryptedBody")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("HasConflict")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Signature")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_WebhookInbox");
+
+                    b.HasIndex("Provider", "EventId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Inbox_ProviderEvent");
+
+                    b.ToTable("WebhookInbox", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_Inbox_Status", "\"Status\" IN ('Pending','Processed','Rejected')");
+                        });
+                });
+
             modelBuilder.Entity("Labaik.Domain.Bookings.Booking", b =>
                 {
                     b.HasOne("Labaik.Domain.Users.User", null)
@@ -465,6 +747,43 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("Id", "FamilyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("FK_RefreshTokens_ParentFamily");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Payments.CapturedPayment", b =>
+                {
+                    b.HasOne("Labaik.Infrastructure.Payments.PaymentAttempt", null)
+                        .WithMany()
+                        .HasForeignKey("AttemptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Captures_Attempts");
+
+                    b.HasOne("Labaik.Domain.Bookings.Booking", null)
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Captures_Bookings");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Payments.OutboxMessage", b =>
+                {
+                    b.HasOne("Labaik.Domain.Bookings.Booking", null)
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Outbox_Bookings");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Payments.PaymentAttempt", b =>
+                {
+                    b.HasOne("Labaik.Domain.Bookings.Booking", null)
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Attempts_Bookings");
                 });
 #pragma warning restore 612, 618
         }

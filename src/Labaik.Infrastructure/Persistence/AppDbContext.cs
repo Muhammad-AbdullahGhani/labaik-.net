@@ -1,4 +1,5 @@
 using Labaik.Domain.Bookings;
+using Labaik.Infrastructure.Payments;
 using Labaik.Infrastructure.Identity;
 using Labaik.Domain.Users;
 using Labaik.Domain.Vouchers;
@@ -15,11 +16,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<VoucherRedemption> VoucherRedemptions => Set<VoucherRedemption>();
     public DbSet<RefreshFamily> RefreshFamilies => Set<RefreshFamily>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<PaymentAttempt> PaymentAttempts => Set<PaymentAttempt>();
+    public DbSet<CapturedPayment> CapturedPayments => Set<CapturedPayment>();
+    public DbSet<WebhookInbox> WebhookInbox => Set<WebhookInbox>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<JobRun> JobRuns => Set<JobRun>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("app");
         CoreModel.Configure(modelBuilder);
         AuthModel.Configure(modelBuilder);
+        PaymentModel.Configure(modelBuilder);
     }
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

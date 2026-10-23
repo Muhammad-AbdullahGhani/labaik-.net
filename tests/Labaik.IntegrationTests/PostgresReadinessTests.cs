@@ -65,8 +65,8 @@ public sealed class PostgresReadinessTests
         await gatewayDb.Database.MigrateAsync();
         await appDb.Database.MigrateAsync();
         await gatewayDb.Database.MigrateAsync();
-        Assert.Equal(3, (await appDb.Database.GetAppliedMigrationsAsync()).Count());
-        Assert.Single(await gatewayDb.Database.GetAppliedMigrationsAsync());
+        Assert.Equal(4, (await appDb.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(2, (await gatewayDb.Database.GetAppliedMigrationsAsync()).Count());
 
         foreach (var pair in new[] { (appConnection, "fake_gateway"), (gatewayConnection, "app") })
         {

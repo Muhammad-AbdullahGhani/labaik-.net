@@ -58,3 +58,23 @@ Passed!  - Failed:     0, Passed:    26, Skipped:     0, Total:    26, Duration:
 Identity tests use real PostgreSQL for concurrent same-key recovery, restart recovery, changed-key/late replay family revocation, consumed-child rejection, explicit provisioning, same-email UID isolation, JWT validation and shared account/IP limits. Six offline real Admin SDK cases replace only HTTP with local certificate/OAuth/revocation responses; signature/project/expiry (including just-expired)/revocation rejection logic executes unchanged. No live Firebase exchange or real project credentials were verified. Dependency vulnerability scan again reported no known vulnerable packages, including transitive dependencies; Compose config passed. No later business endpoints are enabled.
 
 Post-identity container recheck: `docker compose up --build --wait` exited 0 with successful migrations and healthy PostgreSQL/API/gateway. All four HTTP health probes returned 200 Healthy; /bookings returned 404 and /auth/firebase returned 503 with no live Firebase/auth configuration (fail-closed, not a fake login). `docker compose down` exited 0. The final constant-time request-key comparison was additionally covered by the final local build/full test run; the Docker smoke verifies container/migration/route operation, not a live Firebase login.
+
+## Step 3 - new payment suite only
+
+User explicitly requested new tests only, with no full older-suite rerun. Observed commands:
+
+```text
+dotnet test tests/Labaik.IntegrationTests --configuration Release --filter FullyQualifiedName~PaymentIntegrationTests --logger "trx;LogFilePrefix=step3-acceptance-new-only" --results-directory artifacts/tests
+Passed!  - Failed:     0, Passed:    28, Skipped:     0, Total:    28, Duration: 10 s - Labaik.IntegrationTests.dll (net10.0)
+
+dotnet build --configuration Release
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+```
+
+`docker compose config --quiet` and `git diff --check` exited 0. PostgreSQL Testcontainers applied both new migrations under distinct schema-owner roles; Core/gateway HTTP tests ran with separate restricted runtime roles. The new suite includes ONE 200-request concurrency case, not a rerun of the old domain/identity suites. Tests exercise real HTTP via TestServer, provider-host restart against durable data and deterministic lost-response/SQL-failure boundaries. They do not claim real card processing, literal OS process kill or a live HyperPay deployment.
+
+Initial compilation caught deprecated .NET test-host APIs; used supported HostBuilder/TestServer wiring instead of suppressing warnings. First executed suite passed 24/25; the one failure was a test callback base URL targeting / instead of /webhooks/gateway. Fixed the URL, verified the failing case alone, then extended and passed the new suite (27, finally 28 cases) including final-failure stale-response protection. Old migration-count assertions were updated for the new migrations but those old suites were NOT rerun. No new packages were added, so no additional dependency restore/scan or Docker image/stack rebuild was performed beyond the build's normal cached restore. CI still runs its normal full verification after push; that external run remains unverified.
+
+Core sale/capture/callback routes and Core payment-worker activation remain off pending step 4. Gateway authenticated simulation routes are available when configured; its dispatcher defaults off. Actual automatic refunds/capacity and downstream assignment/email/push integrations are not included in this result. Existing successful local Compose/identity results above are historical and are not fresh step-3 deployment evidence.

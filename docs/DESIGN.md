@@ -1,6 +1,6 @@
 # Design
 
-Status: steps 1, 2a and 2b implemented and verified locally. No later step is authorized. GitHub/GHCR execution and live managed hosting/Firebase exchange remain unverified. See [PLAN.md](PLAN.md) and [VERIFICATION.md](VERIFICATION.md).
+Status: steps 1, 2a, 2b and 3 implemented locally. Step 3 verification ran only the new payment suite at the user's request; previous regression results are historical. Core public payment routes/workers stay disabled until step 4. No later step is authorized.
 
 ## Architecture
 
@@ -95,3 +95,42 @@ Shared fixed-minute PostgreSQL upserts bound per-IP and verified-account request
 Identity acceptance: Release build 0 warnings/errors; final full suite 744 domain + 26 integration (including real PostgreSQL and six actual-SDK controlled-HTTP cases) + 3 gateway tests, 0 failed/skipped. Additional tests prove recovery does not resurrect a consumed child and explicit verified-UID role changes revoke old refresh families. No live service-account credentials or Firebase project were used; actual SDK cryptography/project/expiry/revocation logic ran against generated certificates and controlled HTTP responses.
 
 Post-identity Compose build/migrations/readiness and shutdown passed locally; unconfigured Firebase exchange returned 503 and booking endpoint 404. Upstream Firebase revocation is checked on exchange/provisioning; already-issued local sessions have their own family lifecycle and are not continuously revalidated against Firebase. Live-project exchange/host ingress/trusted-proxy setup and external GitHub/GHCR remain manual verification items.
+
+## Step 3 - checkout, gateway verification and durable delivery
+
+PaymentCheckout locks the owned booking, freezes a server-generated request fingerprint and saves PaymentAttempt plus its recovery JobRun before any HTTP call. A partial unique index permits at most one Creating/Pending/Unknown/Succeeded attempt per booking. Repeated/new double-tap keys reuse it; same-key payload changes conflict. Provider errors/timeouts stay Unknown and block another attempt; only an authoritative final no-charge failure permits another key/attempt. Fingerprints use invariant formatting across replicas. The fake gateway persists idempotency-key/payload binding and a booking-wide unique charge, including across HTTP-host restart. A real provider must promise equivalent key/final-failure semantics; local uniqueness alone cannot stop two external charges.
+
+Gateway checkouts, charges and encrypted events live in fake_gateway with its own restricted credentials and migration. HTTP operations require the shared API key. Simulation covers latency, response failure after commit, query outage, duplicate callback delivery and a configured browser redirect. Failed/Succeeded gateway outcomes are final; a failed checkout cannot later charge. Redirect target is configuration, never request input; redirect cannot mark Core paid.
+
+Webhook envelope version 1 contains a version byte, fresh nonce, GCM tag and ciphertext; HMAC-SHA256 covers the entire raw envelope. Core bounds body size, verifies HMAC before decrypting, validates fields, stores the exact encrypted body/signature and deduplicates UNIQUE(provider,eventId) before acknowledging. Reusing an event ID with different wire bytes is quarantined. Provider retries must reuse the stored event body rather than re-encrypting it under the same ID. This is a documented simulation protocol, not a claim of real HyperPay wire compatibility or transparent multi-key rotation.
+
+Workers re-query the authenticated gateway and check checkout/key/booking/amount/currency/transaction identity before credit. Gateway observations happen outside transactions; inside the commit transaction, job ownership and current booking/attempt state are re-read. Succeeded/Failed local attempts never regress on an older Pending response. Capture ledger, Paid transition/version, BookingPaid outbox intent and inbox acknowledgement commit together. BookingPaid is a durable integration event for future assignment/email/push handlers; those business integrations are not implemented here. Late payment on Cancelled records the capture plus RefundRequired/AccountantAlert intents without resurrecting the booking. Actual capacity allocation/refund execution is step 4, so public Core checkout/callback routes and payment worker activation remain disabled now.
+
+JobRun claims use unique schedule keys, FOR UPDATE SKIP LOCKED, database-clock leases and increasing claim versions. Immediate per-entity jobs use a canonical scheduled slot; retries move AvailableAt rather than insert another schedule. Queries/sends run outside DB transactions. Final writes require the matching live owner/version under a row lock; crashed owners recover after lease expiry. Healthy pending-payment polling resets the error budget, while consecutive failures back off and dead-letter. Clearing EF tracked changes after a rolled-back business write prevents accidentally saving those failed inserts with the retry update. Generic receiver errors are stored as exception-type codes, never payload/secret details.
+
+The outbox publishes over a private HTTP contract using a stable Idempotency-Key, then records acknowledgement under the job fence. Ambiguous acknowledgement can deliver twice; receiver deduplication is required. Gateway callback delivery likewise retries exact saved bytes with leases/backoff/dead letters. Background implementations exist, but Core production activation is intentionally withheld for step 4 and gateway dispatch defaults off. No advisory locks or new packages were added.
+
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant A as Core
+    participant D as Core DB
+    participant G as Fake Gateway HTTP
+    participant W as Worker
+    C->>A: checkout retry (future public route)
+    A->>D: save/reuse attempt and recovery job
+    A->>G: create with saved key
+    G-->>A: checkout or unknown response
+    Note over A,G: timeout keeps same blocking attempt
+    G->>A: signed encrypted callback (test adapter in step 3)
+    A->>D: unique inbox and job
+    A-->>G: accepted after commit
+    W->>G: query current authoritative result
+    W->>D: fence + capture + Paid + outbox + inbox acknowledgement
+    W->>C: future integration event delivery via receiver
+    Note over W,C: receiver must deduplicate repeated message IDs
+```
+
+Test evidence: 28 new PostgreSQL/HTTP payment cases passed; build 0 warnings/errors. Covers 200-way checkout/pay retries, same/different callback IDs, response-loss/restart, callback before create response/redirect, amount/currency/reference mismatches, forged/GCM-invalid/oversized input, query retry, forced outbox-write rollback, stale leases, lost publication acknowledgement, dead letters, final-failure races, late cancellation and disabled public routes. Fake HTTP hosts restart against the same durable DB; response-loss/storage faults are deterministic failpoints, not literal OS process kills. Full older suites, Docker image/stack rebuild and external providers were not rerun in this step, per the requested faster targeted workflow. See VERIFICATION.md and DEMO_PREP.md.
+
+Ledger scope note: capture records are append-only in the supported application workflow, with no editing/deletion endpoints. No trigger forbids a privileged database owner from rewriting history; do not present that as a database-enforced immutable ledger. Financial uniqueness and state/counter checks are database-enforced separately.

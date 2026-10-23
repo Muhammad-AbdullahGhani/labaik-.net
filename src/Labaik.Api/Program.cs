@@ -1,4 +1,5 @@
 using Labaik.Infrastructure.Hosting;
+using Labaik.Infrastructure.Payments;
 using Labaik.Api;
 using Labaik.Domain.Bookings;
 using Labaik.Infrastructure.Identity;
@@ -15,6 +16,7 @@ ServiceHost.AddHealthOnlyHost(builder, "app");
 builder.Services.AddDbContext<AppDbContext>((services, options) =>
     options.UseNpgsql(services.GetRequiredService<Npgsql.NpgsqlDataSource>(), postgres => postgres.MigrationsHistoryTable("__EFMigrationsHistory", "app")));
 AuthEndpoints.AddIdentity(builder);
+builder.Services.AddPaymentCore(builder.Configuration);
 var app = builder.Build();
 // Validate configuration without opening a database connection or applying migrations.
 _ = app.Services.GetRequiredService<Npgsql.NpgsqlDataSource>();

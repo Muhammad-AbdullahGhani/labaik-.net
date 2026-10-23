@@ -66,3 +66,29 @@ Create separate GitHub environments for staging and production when needed; use 
 | FIREBASE_CREDENTIALS_JSON | Optional Compose substitution source for trusted service-account JSON; quote correctly in an ignored .env or inject from shell/secret manager. |
 
 Missing auth settings leave health available and authentication unavailable/fail-closed; there are no development signing-key defaults. Existing step-1 .env files are NOT overwritten: add auth variables using your secret manager or generate separate random keys locally, preserving all PostgreSQL passwords. Never print these values into logs or commits. Keep keys consistent across replicas/restarts so same-request recovery works; recovery key changes require coordination (wait out recovery windows or revoke families), while signing-key rotation invalidates outstanding access tokens in this single-key version.
+
+## Step 3 payment simulation and workers
+
+| Name | Requirement / purpose |
+|---|---|
+| Gateway__ApiKey | Shared private gateway API credential, required by Core HTTP client and gateway simulation endpoints; never sent to a customer browser. |
+| Payments__GatewayUrl | Core's configured gateway HTTP base address; no customer-supplied URL is accepted. |
+| Payments__WebhookEncryptionKey | Independent base64-encoded key whose decoded length is exactly 32 bytes; shared by gateway encoder/Core decoder. |
+| Payments__WebhookSignatureKey | Different base64-encoded 32-byte HMAC key; signature covers the raw encrypted body. |
+| Payments__EventReceiverUrl | Optional future durable follow-up receiver's full endpoint URL; not an email/FCM implementation. Missing configuration must not result in false publication success. |
+| Payments__EventReceiverKey | Private receiver authentication key; required for outbox publication. |
+| Gateway__WebhookUrl | Full signed-callback URL for the gateway dispatcher. Core's production callback is still unmapped until step 4. |
+| Gateway__ReturnUrl | Trusted server-configured browser return URL; redirects require HTTPS or loopback HTTP. Redirect does not prove payment. |
+| Gateway__DispatchEnabled | Optional gateway-dispatch switch; leave disabled until production callback activation in step 4. |
+| Gateway__Simulation__CreateDelayMs | Optional bounded delay after checkout commit, used to model lost/late responses. |
+| Gateway__Simulation__QueryDelayMs | Optional bounded query latency. |
+| Gateway__Simulation__PayResponseDelayMs | Optional bounded delay after charge/event commit. |
+| Gateway__Simulation__FailCreateResponse | Optional failure response after a durable checkout was created. |
+| Gateway__Simulation__FailPayResponse | Optional failure response after a durable payment outcome was committed. |
+| Gateway__Simulation__QueryUnavailable | Optional gateway query outage. |
+| Gateway__Simulation__DeliveryCopies | Optional bounded repeated delivery of the exact persisted event body. |
+| GATEWAY_API_KEY | Compose substitution source for the private gateway key. |
+| WEBHOOK_ENCRYPTION_KEY | Compose substitution source for the encryption key. |
+| WEBHOOK_SIGNATURE_KEY | Compose substitution source for the HMAC key. |
+
+New local .env generation includes payment keys. For an existing .env, scripts/add-payment-env.py appends only missing payment secrets without rotating existing database/auth credentials or printing values. There is no public simulation-control endpoint: faults are trusted operator configuration. Core payment services/worker implementations are registered but callback/sale routes and worker activation are deliberately deferred until capacity/refunds in step 4. Do not interpret the available signed callback adapter in test composition as a production route.

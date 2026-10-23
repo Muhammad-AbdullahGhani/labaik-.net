@@ -10,6 +10,7 @@ var builder = WebApplication.CreateBuilder(migrateOnly ? [] : args);
 ServiceHost.AddHealthOnlyHost(builder, "fake_gateway");
 builder.Services.AddDbContext<GatewayDbContext>((services, options) =>
     options.UseNpgsql(services.GetRequiredService<Npgsql.NpgsqlDataSource>(), postgres => postgres.MigrationsHistoryTable("__EFMigrationsHistory", "fake_gateway")));
+GatewayEndpoints.Add(builder);
 var app = builder.Build();
 // Validate configuration without opening a database connection or applying migrations.
 _ = app.Services.GetRequiredService<Npgsql.NpgsqlDataSource>();
@@ -33,6 +34,7 @@ if (migrateOnly)
 }
 
 ServiceHost.MapHealthOnlyHost(app);
+GatewayEndpoints.Map(app);
 await app.RunAsync();
 
 public partial class GatewayProgram;

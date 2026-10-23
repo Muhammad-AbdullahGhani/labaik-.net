@@ -7,3 +7,5 @@ artifacts/
 !.env.example
 .vs/
 .idea/
+
+**/__pycache__/

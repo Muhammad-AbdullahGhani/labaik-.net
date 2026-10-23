@@ -1,6 +1,6 @@
 # Proposed implementation plan
 
-Status: steps 1, 2a and 2b verified locally; no later work authorized. External CI/registry/hosting and live Firebase exchange remain unverified. This document proposes behavior; it does not claim implementation or passing tests.
+Status: steps 1, 2a, 2b and 3 implemented locally; step 3 ran only its new payment suite at user request. No step 4 work authorized. External CI/registry/hosting and live Firebase exchange remain unverified. This document proposes behavior; it does not claim implementation or passing tests.
 
 ## 1. Structure and transaction rules
 
@@ -152,7 +152,7 @@ Use process kill/restart or deterministic failpoints at transaction/provider bou
 
 User amendment: step 2 was split into separately tested/committed 2a (domain) and 2b (identity). Step 1 verification also has its own requested commit.
 
-Steps 1, 2a and 2b are authorized/completed locally; wait for further permission before later work. Every implementation step ends with passing relevant tests, design/AI log update and one commit; prior tests remain green. Deployment needs actual hosting access; report blockers rather than claiming deployment. Optional polish is outside this build.
+Steps 1, 2a, 2b and 3 are complete locally; wait for permission before step 4. Latest verification is targeted, not a new full regression run. Every implementation step ends with passing relevant tests, design/AI log update and one commit; prior tests remain green. Deployment needs actual hosting access; report blockers rather than claiming deployment. Optional polish is outside this build.
 
 1. **Deploy skeleton:** project boundaries, API/gateway live/ready health, managed PostgreSQL app/fake_gateway schemas and restricted roles, migration runner, non-root multi-stage Dockerfiles, CI build/tests/Testcontainers/vulnerability scan, dev-main staging/main production. HTTP/DB health tests and externally deployed health pass; baseline correlation logs, environment-name reference and expand/contract procedure. Commit: `chore: deploy tested service skeletons`.
 2. **Domain and lean identity:** reduced schema, explicit roles/guards, booking version, pricing; verified Firebase exchange, one role/account, JWT/selected refresh design, shared ingress throttle and UID provisioning. No invitations UI or linking workflow. Unit rules plus PostgreSQL replay/identity/authorization tests pass. Commit: `feat: enforce domain and identity rules`.
@@ -202,3 +202,5 @@ Durable outbox/job correctness starts in step 3, not step 7. Early public mutati
 | Hosting / zero-downtime migrations | Select one supported managed PostgreSQL host; expand schema before app rollout, contract in a later release, no destructive startup migrations | Requires deployment credentials and provider compatibility checks during step 1; no deployment claimed in this planning task |
 
 No live provider/API/version claims have been verified during this repository-only planning task. Validate current .NET/provider configuration from official documentation when implementing, and record any resulting plan changes. No implementation beyond step 1 proceeds without further authorization.
+
+Step-3 implementation note: durable immediate JobRun schedules use a name containing kind/entity ID with a canonical scheduled slot; AvailableAt controls retries. Inbox/outbox processing and gateway delivery have leases/fencing. Core production routes/worker activation remain withheld until step 4. Follow-up publication uses a private receiver contract; assignment/email/push implementations remain later scope. See DEMO_PREP.md for plain-language presentation.
