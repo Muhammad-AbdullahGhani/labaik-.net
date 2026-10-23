@@ -5,5 +5,7 @@
     <!-- Match the EF design-tool patch; provider minimum versions alone otherwise split runtime references. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.13" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageReference Include="FirebaseAdmin" Version="3.7.0" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.23.0" />
   </ItemGroup>
 </Project>

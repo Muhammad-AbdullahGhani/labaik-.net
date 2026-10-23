@@ -1,4 +1,5 @@
 using Labaik.Domain.Bookings;
+using Labaik.Infrastructure.Identity;
 using Labaik.Domain.Users;
 using Labaik.Domain.Vouchers;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +13,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<DailyCapacity> DailyCapacities => Set<DailyCapacity>();
     public DbSet<Voucher> Vouchers => Set<Voucher>();
     public DbSet<VoucherRedemption> VoucherRedemptions => Set<VoucherRedemption>();
+    public DbSet<RefreshFamily> RefreshFamilies => Set<RefreshFamily>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("app");
         CoreModel.Configure(modelBuilder);
+        AuthModel.Configure(modelBuilder);
     }
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

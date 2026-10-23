@@ -1,6 +1,6 @@
 # Proposed implementation plan
 
-Status: steps 1 and 2a verified locally; step 2b identity authorized next. External CI/registry/hosting execution remains unverified. This document proposes behavior; it does not claim implementation or passing tests.
+Status: steps 1, 2a and 2b verified locally; no later work authorized. External CI/registry/hosting and live Firebase exchange remain unverified. This document proposes behavior; it does not claim implementation or passing tests.
 
 ## 1. Structure and transaction rules
 
@@ -150,7 +150,9 @@ Use process kill/restart or deterministic failpoints at transaction/provider bou
 
 ## 4. Seven core steps: one green commit per step
 
-Step 1 only is authorized. Wait for explicit permission before step 2. Every implementation step ends with passing relevant tests, design/AI log update and one commit; prior tests remain green. Deployment needs actual hosting access; report blockers rather than claiming deployment. Optional polish is outside this build.
+User amendment: step 2 was split into separately tested/committed 2a (domain) and 2b (identity). Step 1 verification also has its own requested commit.
+
+Steps 1, 2a and 2b are authorized/completed locally; wait for further permission before later work. Every implementation step ends with passing relevant tests, design/AI log update and one commit; prior tests remain green. Deployment needs actual hosting access; report blockers rather than claiming deployment. Optional polish is outside this build.
 
 1. **Deploy skeleton:** project boundaries, API/gateway live/ready health, managed PostgreSQL app/fake_gateway schemas and restricted roles, migration runner, non-root multi-stage Dockerfiles, CI build/tests/Testcontainers/vulnerability scan, dev-main staging/main production. HTTP/DB health tests and externally deployed health pass; baseline correlation logs, environment-name reference and expand/contract procedure. Commit: `chore: deploy tested service skeletons`.
 2. **Domain and lean identity:** reduced schema, explicit roles/guards, booking version, pricing; verified Firebase exchange, one role/account, JWT/selected refresh design, shared ingress throttle and UID provisioning. No invitations UI or linking workflow. Unit rules plus PostgreSQL replay/identity/authorization tests pass. Commit: `feat: enforce domain and identity rules`.

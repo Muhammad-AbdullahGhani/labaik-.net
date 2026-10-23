@@ -82,3 +82,17 @@ The first working-Docker run exposed a real test setup bug: Testcontainers strin
 ## Entry 005 - Step 2a completed before identity
 
 User's follow-up requested step 2b identity while the step-1 verification was finishing. Asked for ordering because step 2a was still unimplemented; user explicitly answered to complete step 2a then move to step 2b. Implemented only domain core in this commit: state/role table, SAR arithmetic/configured pricing, voucher rules, five entities, named schema constraints and managed booking versions. Documented role decisions and application guards still needed, with Mermaid diagram. Tests: 744 domain, 7 integration, 3 gateway passed, 0 failed/skipped; Release build 0 warnings/errors. Corrected one constraint test that initially touched unrelated bookings, then reran full suite. Accepted: requested 2a scope and continuation into 2b; not accepted/inferred: any later business feature.
+
+## Entry 006 - Step 2b identity
+
+### Prompt and decision
+
+User requested identity only: real Firebase Admin SDK behind IFirebaseTokenVerifier plus fake, UID/project uniqueness and Customer-only creation, explicit verified-UID staff provisioning without public grants/email linking, ten-minute JWT, design-A rotating hashed refresh tokens with family lock/one child/15-second encrypted recovery and committed replay revocation, safe shared IP/account throttling, auth plus health endpoints only, real Testcontainers results and one feat: secure identity and token rotation commit. User clarified to finish 2a first, then 2b. Accepted scope excludes every later booking/payment/offer/payout endpoint.
+
+### Implemented proposal
+
+Added Application verifier contract, real SDK adapter and fake in tests; schema-local refresh families/tokens and rate buckets with named constraints/indexes, PostgreSQL row locking and unique parent. AES-GCM recovers the identical original response, never another child. Replay revocation commits before returning unauthorized. Cleanup purges expired ciphertext and stale buckets idempotently. JWT validates issuer/audience/HS256/lifetime. Explicit --provision-user verifies exact UID then grants role/revokes families; no email selector/public grant. Shared HMAC-keyed DB budgets apply to socket IP and verified identity, not caller email. Documented conservative proxy behavior, absolute family lifetime, ciphertext cleanup lag, token/client/key-rotation requirements and live-provider limits.
+
+### Real validation
+
+Final full tests: 744 domain, 26 integration, 3 gateway, all passed; 0 failed/skipped. Real PostgreSQL tests include refresh concurrency/restart/replay/provisioning and schema/concurrency regressions. Six real Firebase SDK cases use generated certificates and controlled HTTP (no live credentials) to verify signature/project/expiry/revocation behavior. Build passed with 0 warnings/errors. Fixed initial compile mismatches against the current SDK (typed CredentialFactory instead of deprecated FromJson, actual AuthErrorCode names and HttpClientFactory type). Added strict post-verification Firebase expiry to remove SDK leeway for issuing fresh local sessions. Vulnerability scan clean. Live Firebase/managed hosting and GitHub/GHCR remain unverified. Post-identity Compose build/up passed with both migration jobs and four healthy HTTP probes; booking route 404, unconfigured Firebase exchange 503; down passed. Final constant-time retry-key comparison and two extra security tests passed in the final local run. No later scope is authorized.

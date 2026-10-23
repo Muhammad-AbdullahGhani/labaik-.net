@@ -53,6 +53,12 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: "8080"
+      Auth__Issuer: labaik-core
+      Auth__Audience: labaik-clients
+      Auth__SigningKey: ${AUTH_SIGNING_KEY:-}
+      Auth__RecoveryKey: ${AUTH_RECOVERY_KEY:-}
+      Firebase__ProjectId: ${FIREBASE_PROJECT_ID:-}
+      Firebase__CredentialsJson: ${FIREBASE_CREDENTIALS_JSON:-}
       ConnectionStrings__Database: Host=postgres;Database=labaik;Username=labaik_app;Password=${APP_DB_PASSWORD:?Set APP_DB_PASSWORD};Timeout=2;Command Timeout=2
     ports:
       - "127.0.0.1:8080:8080"

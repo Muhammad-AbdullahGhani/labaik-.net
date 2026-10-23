@@ -44,3 +44,17 @@ The failing test is Both_services_are_ready_only_while_real_PostgreSQL_is_reacha
 ## Step 2a results
 
 `dotnet build --configuration Release`: exit 0, 0 warnings/errors. `dotnet test --configuration Release --logger "trx;LogFilePrefix=step2a-final" --results-directory artifacts/tests`: exit 0; Domain.Tests 744 passed, IntegrationTests 7 passed, Gateway.Tests 3 passed; 0 failed/skipped. PostgreSQL migration/checks and stale-version tests ran against real containers. Initial constraint test failure was due to updating unrelated rows; fixed by binding its own booking ID. No identity/refresh behavior exists in this commit.
+
+## Step 2b identity acceptance
+
+`dotnet build --configuration Release`: exit 0, 0 warnings/errors. Final full `dotnet test --configuration Release --logger "trx;LogFilePrefix=identity-acceptance" --results-directory artifacts/tests`: exit 0.
+
+```text
+Passed!  - Failed:     0, Passed:   744, Skipped:     0, Total:   744, Duration: 622 ms - Labaik.Domain.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:     3, Skipped:     0, Total:     3, Duration: 1 s - Labaik.Gateway.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:    26, Skipped:     0, Total:    26, Duration: 13 s - Labaik.IntegrationTests.dll (net10.0)
+```
+
+Identity tests use real PostgreSQL for concurrent same-key recovery, restart recovery, changed-key/late replay family revocation, consumed-child rejection, explicit provisioning, same-email UID isolation, JWT validation and shared account/IP limits. Six offline real Admin SDK cases replace only HTTP with local certificate/OAuth/revocation responses; signature/project/expiry (including just-expired)/revocation rejection logic executes unchanged. No live Firebase exchange or real project credentials were verified. Dependency vulnerability scan again reported no known vulnerable packages, including transitive dependencies; Compose config passed. No later business endpoints are enabled.
+
+Post-identity container recheck: `docker compose up --build --wait` exited 0 with successful migrations and healthy PostgreSQL/API/gateway. All four HTTP health probes returned 200 Healthy; /bookings returned 404 and /auth/firebase returned 503 with no live Firebase/auth configuration (fail-closed, not a fake login). `docker compose down` exited 0. The final constant-time request-key comparison was additionally covered by the final local build/full test run; the Docker smoke verifies container/migration/route operation, not a live Firebase login.

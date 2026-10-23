@@ -290,6 +290,116 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Labaik.Infrastructure.Identity.AuthRateBucket", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("WindowStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Key")
+                        .HasName("PK_AuthRateBuckets");
+
+                    b.HasIndex("WindowStart")
+                        .HasDatabaseName("IX_AuthRateBuckets_Expiry");
+
+                    b.ToTable("AuthRateBuckets", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_AuthRateBuckets_Count", "\"Count\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Identity.RefreshFamily", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id")
+                        .HasName("PK_RefreshFamilies");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_RefreshFamilies_User");
+
+                    b.ToTable("RefreshFamilies", "app");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Identity.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EncryptedSuccessor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RetryKeyHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("RetryUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id")
+                        .HasName("PK_RefreshTokens");
+
+                    b.HasAlternateKey("Id", "FamilyId")
+                        .HasName("AK_RefreshTokens_IdFamily");
+
+                    b.HasIndex("FamilyId");
+
+                    b.HasIndex("Hash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_RefreshTokens_Hash");
+
+                    b.HasIndex("ParentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_RefreshTokens_Parent");
+
+                    b.HasIndex("RetryUntil")
+                        .HasDatabaseName("IX_RefreshTokens_RecoveryExpiry");
+
+                    b.HasIndex("ParentId", "FamilyId");
+
+                    b.ToTable("RefreshTokens", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_RefreshTokens_Hash", "length(\"Hash\")=64");
+
+                            t.HasCheckConstraint("CK_RefreshTokens_Rotation", "(\"ConsumedAt\" IS NULL AND \"RetryUntil\" IS NULL AND \"RetryKeyHash\" IS NULL AND \"EncryptedSuccessor\" IS NULL) OR (\"ConsumedAt\" IS NOT NULL AND \"RetryUntil\" IS NOT NULL AND \"RetryKeyHash\" IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Labaik.Domain.Bookings.Booking", b =>
                 {
                     b.HasOne("Labaik.Domain.Users.User", null)
@@ -328,6 +438,33 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_Redemptions_Vouchers");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Identity.RefreshFamily", b =>
+                {
+                    b.HasOne("Labaik.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_RefreshFamilies_Users");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Identity.RefreshToken", b =>
+                {
+                    b.HasOne("Labaik.Infrastructure.Identity.RefreshFamily", null)
+                        .WithMany()
+                        .HasForeignKey("FamilyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_RefreshTokens_Family");
+
+                    b.HasOne("Labaik.Infrastructure.Identity.RefreshToken", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId", "FamilyId")
+                        .HasPrincipalKey("Id", "FamilyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_RefreshTokens_ParentFamily");
                 });
 #pragma warning restore 612, 618
         }

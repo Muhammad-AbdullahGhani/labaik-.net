@@ -1,6 +1,6 @@
 # Environment variable reference
 
-Names and purposes only; no credentials or example values are recorded. Business/auth/storage secrets are deliberately absent until later steps need them. No appsettings file contains secrets. The ignored local .env is generated once by scripts/create-local-env.py and loaded by Docker Compose, not by dotnet run.
+Names and purposes only; no credentials or example values are recorded. Storage/payment secrets remain absent until later steps; identity settings are listed below. No appsettings file contains secrets. The ignored local .env is generated once by scripts/create-local-env.py and loaded by Docker Compose, not by dotnet run.
 
 ## Service processes (API, gateway, explicit migration runners)
 
@@ -44,3 +44,25 @@ Bootstrap passwords populate role definitions; runtime processes receive only th
 | REVISION | Workflow-provided immutable image revision, not a manually configured secret. |
 
 Create separate GitHub environments for staging and production when needed; use the same host-secret names in each. The optional orchestrator contract is in DEPLOYMENT.md. Standard inherited OS/SDK variables are not application configuration.
+
+## Identity (API only; step 2b)
+
+| Name | Requirement / purpose |
+|---|---|
+| Firebase__ProjectId | Required for auth; expected Firebase project. |
+| Firebase__CredentialsJson | Required for real verification; trusted service-account JSON from the secret manager. Only service-account credential type is accepted. Never a client-supplied document. |
+| Auth__Issuer | Required JWT issuer. |
+| Auth__Audience | Required JWT audience. |
+| Auth__SigningKey | Required independent cryptographically random base64-encoded key, decoded length exactly 32 bytes. |
+| Auth__RecoveryKey | Required different base64-encoded 32-byte AES-GCM recovery key; also HMACs opaque limiter subjects with a distinct message prefix. |
+| Auth__IpLimit | Optional positive per-IP fixed-minute request budget. |
+| Auth__AccountLimit | Optional positive per-verified-account fixed-minute budget shared across IPs. |
+| Provisioning__FirebaseIdToken | Operator command only: fresh ID token for the exact identity to provision; secret environment injection, never CLI argument/history. |
+| Provisioning__Role | Operator command only: explicit staff/performer role, not Customer/System. |
+| FIREBASE_AUTH_EMULATOR_HOST | Must remain unset for the real adapter; emulator mode is explicitly refused because it bypasses signature guarantees. Tests inject controlled HTTP/verifier implementations instead. |
+| AUTH_SIGNING_KEY | Compose substitution source for API signing key; new local .env files generate it. |
+| AUTH_RECOVERY_KEY | Compose substitution source for recovery key; new local .env files generate it independently. |
+| FIREBASE_PROJECT_ID | Optional Compose substitution source for the Firebase project. |
+| FIREBASE_CREDENTIALS_JSON | Optional Compose substitution source for trusted service-account JSON; quote correctly in an ignored .env or inject from shell/secret manager. |
+
+Missing auth settings leave health available and authentication unavailable/fail-closed; there are no development signing-key defaults. Existing step-1 .env files are NOT overwritten: add auth variables using your secret manager or generate separate random keys locally, preserving all PostgreSQL passwords. Never print these values into logs or commits. Keep keys consistent across replicas/restarts so same-request recovery works; recovery key changes require coordination (wait out recovery windows or revoke families), while signing-key rotation invalidates outstanding access tokens in this single-key version.

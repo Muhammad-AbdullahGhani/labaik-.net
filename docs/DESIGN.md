@@ -1,6 +1,6 @@
 # Design
 
-Status: steps 1 and 2a implemented; step 2b identity is now authorized. Local build and HTTP smoke checks passed, but Docker-dependent verification and external deployment remain blocked. See [PLAN.md](PLAN.md) for the revised decisions and acceptance tests.
+Status: steps 1, 2a and 2b implemented and verified locally. No later step is authorized. GitHub/GHCR execution and live managed hosting/Firebase exchange remain unverified. See [PLAN.md](PLAN.md) and [VERIFICATION.md](VERIFICATION.md).
 
 ## Architecture
 
@@ -8,7 +8,7 @@ Proposed: Domain / Application / Infrastructure / Api; separate fake gateway HTT
 
 ## State machine diagram
 
-Proposed normal path below. Exceptional transitions, role matrix, and guards remain subject to approval in PLAN.md.
+Implemented domain transition/role graph below. Ownership, verified money and assignment guards remain application responsibilities before any future business endpoint is exposed.
 
 ```mermaid
 stateDiagram-v2
@@ -38,15 +38,15 @@ Payment, refund, offer, and payout states are separate from booking state. A lat
 
 ## How races, double payment, and duplicate webhooks are prevented
 
-Future work only: concrete business schema constraints, row locks and lock order, conditional updates, gateway idempotency, durable inbox/outbox and token-family transactions. Proposed mechanisms are in PLAN.md; none of those business mechanisms are implemented in step 1.
+Implemented: booking version checks, named money/capacity checks and transactional refresh-family locking. Future payment/assignment work: conditional capacity allocation, gateway idempotency, durable inbox/outbox and offer/payout transactions. Proposed mechanisms are in PLAN.md; those payment features are not claimed implemented.
 
 ## Failure scenarios tested
 
-Step-1 health smoke tests ran; real PostgreSQL test could not start because Docker is unavailable. No business failure tests have run. Record each future scenario, test name, observed invariant, and remaining limitation here after implementation. Planned scenarios include crash after charge, gateway timeout, webhook before redirect, payment after cancellation, capacity overflow, offer expiry, payout retries, and refresh-token replay.
+Latest runs include real PostgreSQL readiness/isolation, monetary constraint rejection, stale booking writes and identity replay races; all passed. The initial Docker-unavailable run is historical. Payment/offer/payout crash tests have not run because those features are not implemented. Record each future scenario, test name, observed invariant, and remaining limitation here after implementation. Planned scenarios include crash after charge, gateway timeout, webhook before redirect, payment after cancellation, capacity overflow, offer expiry, payout retries, and refresh-token replay.
 
 ## Trade-offs
 
-Revised proposals: paid-only capacity allocation; refund on overflow; unresolved payments block a new attempt; at-least-once external delivery; PostgreSQL-backed hosted workers with row claims, no advisory locks; CSV only in core. Recommend encrypted same-successor refresh recovery; PLAN.md compares it with simpler new-child grace and explicitly describes the branching risk. Reduced tables give up multi-role accounts, invitation workflows and complete historical audit; financial ledgers remain. Step 1 only has been authorized; wait before step 2.
+Revised proposals: paid-only capacity allocation; refund on overflow; unresolved payments block a new attempt; at-least-once external delivery; PostgreSQL-backed hosted workers with row claims, no advisory locks; CSV only in core. Recommend encrypted same-successor refresh recovery; PLAN.md compares it with simpler new-child grace and explicitly describes the branching risk. Reduced tables give up multi-role accounts, invitation workflows and complete historical audit; financial ledgers remain. The user authorized 2a then 2b; stop after the identity commit.
 
 ## What I'd do next
 
@@ -79,3 +79,19 @@ Money is a nonnegative SAR long value with checked addition/subtraction. Pricing
 BookingCore migration creates User, Booking, DailyCapacity, Voucher and VoucherRedemption with named checks/FKs/indexes. SQL numeric casts protect the total CHECK expression from bigint intermediate overflow; nullable discount shapes explicitly check IS NOT NULL because SQL UNKNOWN otherwise passes CHECK. EF versions increment on every tracked booking update while retaining the original token in WHERE; raw SQL/bulk writers must explicitly check/increment it. No generic audit or identity behavior was added.
 
 Validation: Release build 0 warnings/errors; full tests 744 domain + 7 integration + 3 gateway, all passed, zero skipped. Includes every state/role pair, monetary/rounding boundaries, voucher expiry/limits, real migration/constraint rejection and stale writes through synchronous/asynchronous saves. An initial test updated unrelated bookings; scoped that invalid write to its own row before rerunning successfully. User then authorized completing step 2b; it is the only next scope.
+
+## Step 2b - identity and replay protection
+
+API exposes only health, Firebase exchange, refresh and authenticated /auth/me; gateway still exposes health only. IFirebaseTokenVerifier has a real Firebase Admin implementation (signature/project/issuer/expiry and checkRevoked=true), with stricter rejection after actual expiry rather than relying on SDK clock-skew allowance. Service-account credential loading explicitly restricts the credential type. Real verifier rejects emulator mode. Tests fake the verifier at the application boundary and also run the actual SDK against local test certificates, OAuth and revocation responses; this is not a live Firebase project check.
+
+Users are UNIQUE(project,UID), never selected by email; Firebase claims cannot grant roles. Login inserts Customer only and preserves an explicitly provisioned role for an existing UID. --provision-user is a separate operator CLI that verifies the exact UID token before changing a role and revoking refresh families; no public role-grant endpoint exists. Operator possession of the server/DB credentials is its trust boundary.
+
+JWTs carry sub/role/jti, expire in ten minutes and validate exact issuer/audience/HS256 signature/lifetime with zero local JWT skew. Refresh secrets have 256 random bits and only SHA-256 hashes are searchable in DB. Rotation locks RefreshFamily in PostgreSQL, then re-reads its token, consumes the parent and inserts exactly one successor (unique ParentId; composite FK prevents cross-family parenting). Store the complete first response encrypted with AES-GCM using parent ID as authenticated data. Same parent/request key within 15 database-clock seconds recovers the identical response; no grace extension or branch is minted. If that child was already consumed, reject recovery rather than resurrecting it. Changed-key/late replay revokes the family and commits before returning 401, including when the request disconnects after the security decision. Stateless access JWTs remain usable until expiry.
+
+The family has an absolute 30-day lifetime; descendants never extend it. A five-second cleanup worker removes expired recovery ciphertext and old rate buckets with idempotent SQL; usable grace is exactly 15 seconds but physical ciphertext cleanup can lag by one timer interval. All replicas need the same recovery key. A thief with both parent and its exact retry key within grace remains indistinguishable from the client. Recovery/signing key rotation is documented operational work, not a hidden claim of transparent multi-key support.
+
+Shared fixed-minute PostgreSQL upserts bound per-IP and verified-account requests, independently of refresh transactions. Keys are HMAC fingerprints, not stored raw IPs/emails. Only successful Firebase verification or possession of a stored refresh secret selects an account budget. There is no failed-login lockout by submitted email. Forwarded IP headers are ignored until a host-specific trusted-proxy policy is configured; ingress IPs conservatively share a budget meanwhile. Templates/notifications, money gateways and later assignment/payout flows remain unimplemented.
+
+Identity acceptance: Release build 0 warnings/errors; final full suite 744 domain + 26 integration (including real PostgreSQL and six actual-SDK controlled-HTTP cases) + 3 gateway tests, 0 failed/skipped. Additional tests prove recovery does not resurrect a consumed child and explicit verified-UID role changes revoke old refresh families. No live service-account credentials or Firebase project were used; actual SDK cryptography/project/expiry/revocation logic ran against generated certificates and controlled HTTP responses.
+
+Post-identity Compose build/migrations/readiness and shutdown passed locally; unconfigured Firebase exchange returned 503 and booking endpoint 404. Upstream Firebase revocation is checked on exchange/provisioning; already-issued local sessions have their own family lifecycle and are not continuously revalidated against Firebase. Live-project exchange/host ingress/trusted-proxy setup and external GitHub/GHCR remain manual verification items.
