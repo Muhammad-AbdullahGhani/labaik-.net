@@ -1,0 +1,35 @@
+name: Optional managed-host deployment
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      image_root:
+        required: true
+        type: string
+      revision:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      HOST_DEPLOY_URL: ${{ secrets.HOST_DEPLOY_URL }}
+      HOST_DEPLOY_TOKEN: ${{ secrets.HOST_DEPLOY_TOKEN }}
+    steps:
+      - name: Skip cleanly without hosting configuration
+        if: env.HOST_DEPLOY_URL == '' || env.HOST_DEPLOY_TOKEN == ''
+        run: echo "Deployment skipped - no hosting configured. Images were published; follow docs/DEPLOYMENT.md when a host is available."
+      - uses: actions/checkout@v4
+        if: env.HOST_DEPLOY_URL != '' && env.HOST_DEPLOY_TOKEN != ''
+      - name: Invoke configured deployment orchestrator
+        if: env.HOST_DEPLOY_URL != '' && env.HOST_DEPLOY_TOKEN != ''
+        env:
+          IMAGE_ROOT: ${{ inputs.image_root }}
+          REVISION: ${{ inputs.revision }}
+        # Contract: synchronous success means migrations, both rollouts and health checks succeeded.
+        run: python3 scripts/deploy-managed.py

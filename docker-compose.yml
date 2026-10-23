@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: labaik
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+      GATEWAY_DB_PASSWORD: ${GATEWAY_DB_PASSWORD:?Set GATEWAY_DB_PASSWORD in .env}
+      APP_MIGRATOR_PASSWORD: ${APP_MIGRATOR_PASSWORD:?Set APP_MIGRATOR_PASSWORD in .env}
+      GATEWAY_MIGRATOR_PASSWORD: ${GATEWAY_MIGRATOR_PASSWORD:?Set GATEWAY_MIGRATOR_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/001-schemas.sh:/docker-entrypoint-initdb.d/001-schemas.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api-migrate:
+    build:
+      context: .
+      dockerfile: src/Labaik.Api/Dockerfile
+    command: [--migrate]
+    environment:
+      ConnectionStrings__Database: Host=postgres;Database=labaik;Username=labaik_app_migrator;Password=${APP_MIGRATOR_PASSWORD:?Set APP_MIGRATOR_PASSWORD};Timeout=5;Command Timeout=10
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    restart: "no"
+
+  gateway-migrate:
+    build:
+      context: .
+      dockerfile: src/Labaik.FakeGateway/Dockerfile
+    command: [--migrate]
+    environment:
+      ConnectionStrings__Database: Host=postgres;Database=labaik;Username=labaik_gateway_migrator;Password=${GATEWAY_MIGRATOR_PASSWORD:?Set GATEWAY_MIGRATOR_PASSWORD};Timeout=5;Command Timeout=10
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Labaik.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Database: Host=postgres;Database=labaik;Username=labaik_app;Password=${APP_DB_PASSWORD:?Set APP_DB_PASSWORD};Timeout=2;Command Timeout=2
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      api-migrate:
+        condition: service_completed_successfully
+
+  fake-gateway:
+    build:
+      context: .
+      dockerfile: src/Labaik.FakeGateway/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Database: Host=postgres;Database=labaik;Username=labaik_gateway;Password=${GATEWAY_DB_PASSWORD:?Set GATEWAY_DB_PASSWORD};Timeout=2;Command Timeout=2
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      gateway-migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-data:
