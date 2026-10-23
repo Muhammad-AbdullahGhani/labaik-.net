@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Labaik push receiver</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="https://www.gstatic.com/firebasejs/13.0.0/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/13.0.0/firebase-messaging-compat.js"></script>
+  <script defer src="/demo-config.js"></script>
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Labaik push receiver</h1>
+    <p>Keep this page open during the booking demo. Enable notifications, copy the registration token privately, then register it with the API using PowerShell.</p>
+    <button id="enable" disabled>Enable notifications</button>
+    <p id="status" role="status">Loading Firebase client libraries…</p>
+    <label for="token">Device registration token (hidden)</label>
+    <input id="token" type="password" readonly autocomplete="off">
+    <button id="copy" disabled>Copy token privately</button>
+    <p>The token is a delivery credential, not a Firebase login token. Do not paste it into chat or expose it during screen sharing.</p>
+    <h2>Received notifications</h2>
+    <ol id="messages" aria-live="polite"></ol>
+  </main>
+</body>
+</html>

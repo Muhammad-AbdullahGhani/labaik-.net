@@ -119,3 +119,11 @@ New local .env generation includes payment keys. For an existing .env, scripts/a
 | OTEL_SERVICE_NAME | Optional standard resource service-name override. |
 
 Private account/recipient mappings can be supplied as hierarchical environment configuration. Compose does not enumerate private user IDs: add them through an ignored local override or managed secret injection. No actual credential values are listed. Unconfigured notification channels are not promised to deliver; persistent accountant alerts/reports remain available.
+
+## Local notification demo helper
+
+| Name | Purpose |
+|---|---|
+| DEMO_EMAIL_RECIPIENT | Temporary process environment used by configure-demo-email.ps1 to supply one trusted recipient mapping through its ignored Compose override. It is not an identity key. |
+
+The helper temporarily supplies EMAIL_API_KEY/EMAIL_FROM and preserves Firebase settings while recreating the API. It restores the calling process environment afterward and does not persist the Resend key in its generated override. Repeat the helper when recreating the email-enabled stack. The browser receiver's ignored .env.push-demo.json stores only apiKey, projectId, messagingSenderId, appId and the public VAPID key; it must never contain Admin credentials, backend session tokens or the email provider key. These are local receiver settings rather than server environment variables. See NOTIFICATION_DEMO.md.

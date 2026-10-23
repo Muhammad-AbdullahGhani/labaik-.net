@@ -11,6 +11,7 @@ using Labaik.Infrastructure.Payments;
 using Labaik.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Labaik.Infrastructure.Operations;
 
@@ -45,7 +46,7 @@ public interface INotificationTransport
     Task EmailAsync(string address, NotificationText text, Guid messageId, CancellationToken ct);
     Task PushAsync(string token, NotificationText text, CancellationToken ct);
 }
-public sealed class NotificationTransport(HttpClient http, IConfiguration config) : INotificationTransport, IDisposable
+public sealed class NotificationTransport(HttpClient http, IConfiguration config, ILogger<NotificationTransport>? logger = null) : INotificationTransport, IDisposable
 {
     private readonly Lazy<FirebaseApp> _firebase = new(() => FirebaseApp.Create(new AppOptions
     {
@@ -59,7 +60,12 @@ public sealed class NotificationTransport(HttpClient http, IConfiguration config
         request.Headers.Add("Idempotency-Key", messageId.ToString("N"));
         request.Content = JsonContent.Create(new { from = config["Notifications:EmailFrom"] ?? throw new PaymentDependencyException(), to = new[] { address }, subject = text.Subject, text = text.Body });
         using var response = await http.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode) throw new PaymentDependencyException();
+        if (!response.IsSuccessStatusCode)
+        {
+            // A provider error body can contain addresses or request details. Only log its status category.
+            logger?.LogWarning("Email provider rejected delivery with HTTP {StatusCode}", (int)response.StatusCode);
+            throw new PaymentDependencyException();
+        }
     }
     public async Task PushAsync(string token, NotificationText text, CancellationToken ct)
     {
@@ -69,6 +75,11 @@ public sealed class NotificationTransport(HttpClient http, IConfiguration config
         try { _ = await FirebaseMessaging.GetMessaging(_firebase.Value).SendAsync(new Message { Token = token, Notification = new Notification { Title = text.Subject, Body = text.Body } }, ct); }
 #pragma warning restore CS0618
         catch (FirebaseMessagingException error) when (error.MessagingErrorCode == MessagingErrorCode.Unregistered) { throw new InvalidDeviceTokenException(); }
+        catch (FirebaseMessagingException error)
+        {
+            logger?.LogWarning("FCM delivery unavailable: {ErrorCode}", error.MessagingErrorCode);
+            throw;
+        }
     }
     public void Dispose() { if (_firebase.IsValueCreated) _firebase.Value.Delete(); }
 }

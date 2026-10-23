@@ -20,6 +20,8 @@ jobs:
       - run: dotnet build Labaik.sln --no-restore --configuration Release
       # Docker is required here; there is no optional skip for the database integration test.
       - run: dotnet test Labaik.sln --no-build --configuration Release --logger "trx;LogFilePrefix=tests" --results-directory artifacts/tests
+      - name: Check local push receiver safety
+        run: python3 -m unittest discover -s scripts/tests -p test_push_demo.py -v
       - name: Scan all direct and transitive packages
         run: |
           mkdir -p artifacts

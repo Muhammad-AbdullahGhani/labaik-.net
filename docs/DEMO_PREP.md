@@ -70,7 +70,7 @@ Keep this beside the code. Steps 4-6 are committed and lean step 7 has passed it
 
 ## What I must not claim
 
-- No public hosted deployment or live Firebase project exchange has been verified.
+- No public hosted deployment has been verified. Real Firebase token exchange against the local API is now user-verified; that does not verify FCM delivery.
 - No real bank transfer, real HyperPay charge or actual customer card processing exists.
 - Checkout and signed callbacks are enabled with capacity/refund protection; this remains a fake gateway, not real HyperPay.
 - Local tests cover capacity, automatic full refunds, assignment, completion, payout claims, private grants and notification routing. Live provider delivery and bank acceptance remain unverified.
@@ -279,7 +279,7 @@ Follow-up: **What if the old worker wakes up?** It must match the current owner/
 
 Say: "Authentication establishes who you are. Authorization decides whether that identity may perform this action on this booking or file. A valid JWT does not mean you can read someone else's passport."
 
-Follow-up: **Why verify a Firebase token instead of just decoding it?** Decoding only reads claims. The Admin SDK verifies the signature, expected project, expiry and revocation; we also reject an already expired token after verification. Tests use the real SDK with controlled HTTP responses, but a live project exchange still needs configuration.
+Follow-up: **Why verify a Firebase token instead of just decoding it?** Decoding only reads claims. The Admin SDK verifies the signature, expected project, expiry and revocation; we also reject an already expired token after verification. Tests use the real SDK with controlled HTTP responses; the configured real Firebase/local API exchange was subsequently verified by the user.
 
 ### 14. Why identify by Firebase project and UID instead of email?
 
@@ -393,9 +393,9 @@ Aim for 20-40 seconds per main answer. Let the interviewer choose the deeper fol
 
 ## Live Firebase demo: current setup and presentation
 
-We enabled email/password in a real Firebase project, created a demo user, configured a server service-account credential through environment variables and started the local Docker stack. The user's Firebase REST sign-in reached the next step, but the API exchange returned 503. Container configuration inspection found missing local Auth signing/recovery keys; Firebase project/credential JSON were present and consistent. Missing local keys were generated into ignored .env without rotating existing nonempty credentials. The user must recreate the API from the same PowerShell session that holds Firebase environment variables, then retry exchange. A successful real API exchange is not verified yet.
+Live login is now verified by the user's observed PowerShell result on 23 October 2026: Firebase sign-in succeeded, POST /auth/firebase issued a local session, and GET /auth/me returned a local userId and Customer role. No actual user identifier, email, password, API key or token is stored in these notes. This is local API verification against real Firebase, not a hosted deployment or verification of FCM delivery.
 
-Once login succeeds, show this short sequence without displaying token objects or credentials:
+Show this short sequence without displaying token objects or credentials:
 
 1. Show both services' healthy endpoints; say this proves service readiness, not successful Firebase login by itself.
 2. Sign in to Firebase with the demo account; keep its ID token in a PowerShell variable.
@@ -404,6 +404,203 @@ Once login succeeds, show this short sequence without displaying token objects o
 5. Call /auth/me without a token and show 401.
 6. Explain: Firebase authenticates the identity; our API verifies it and assigns local permissions. Email does not link accounts, new identities cannot request Admin, and staff provisioning verifies the exact UID through a separate operator command.
 
-Failure story: health was green while auth exchange returned 503 because optional local token keys were absent. The API failed closed instead of issuing an insecure session. We inspected configuration presence without printing secrets. Only claim the end-to-end flow works after the authenticated /auth/me call actually succeeds.
+Failure story: health was green while auth exchange returned 503 because local token keys were absent. The API failed closed instead of issuing an insecure session. We inspected configuration presence without printing secrets and added missing local keys without rotating database credentials.
 
-Second failure and lesson: after adding local keys, exchange still failed. Safe logs showed that our adapter explicitly set the Firebase SDK HTTP factory to null. Earlier tests injected a fake factory, so they did not exercise production defaults. We preserved the SDK default and added a separate default-path test; all seven Firebase adapter tests passed. Say: "A test double can hide a production initialization bug. I added coverage for both the controlled test transport and the real default configuration path." Live login success still needs the actual /auth/me result.
+Second failure and lesson: after adding local keys, exchange still failed. Safe logs showed that our adapter explicitly set the Firebase SDK HTTP factory to null. Earlier tests injected a fake factory, so they did not exercise production defaults. We preserved the SDK default and added a separate default-path test; all seven Firebase adapter tests passed. Say: "A test double can hide a production initialization bug. I added coverage for both the controlled test transport and the real default configuration path." The user then retried and observed successful /auth/me with Customer role.
+
+## Repeatable Firebase interview walkthrough (about three minutes)
+
+### Before sharing your screen
+
+Firebase setup already completed: registered a project/Web app, enabled Email/Password, created a demo account and obtained the Admin service-account JSON. The Web API key identifies the project for client sign-in; the service-account private key authorizes the trusted backend. They are different credentials. Firebase project/UID identifies the user; the local database stores their role. No Firestore database or Firebase Hosting is needed for this walkthrough.
+
+Open PowerShell in the repository. Run this preparation privately before sharing your screen. Supply the service-account file path without extra quote characters; keep that JSON outside the repository. Existing .env must already contain the independent local signing/recovery keys.
+
+```powershell
+Set-Location 'C:\Users\i222683AbdullahGhani\Desktop\TASK\labaik-core-dotnet'
+$credentialPath = Read-Host 'Path to service-account JSON'
+$firebaseCredential = Get-Content -LiteralPath $credentialPath -Raw | ConvertFrom-Json
+$env:FIREBASE_PROJECT_ID = $firebaseCredential.project_id
+$env:FIREBASE_CREDENTIALS_JSON = $firebaseCredential | ConvertTo-Json -Compress -Depth 10
+docker compose up -d --wait
+
+$firebaseApiKey = Read-Host 'Firebase Web API Key'
+$demoEmail = Read-Host 'Demo account email'
+$demoPassword = Read-Host 'Demo account password' -AsSecureString
+Clear-Host
+```
+
+Keep this same window open. Environment variables belong to this shell session; a new shell must load them again before recreating the API. Clear-Host removes visible output, not command history; prompts keep credential values out of the commands typed into history. Never expand or display the credential/token variables.
+
+### Show 1: services can respond
+
+```powershell
+Invoke-RestMethod 'http://localhost:8080/health/ready'
+Invoke-RestMethod 'http://localhost:8081/health/ready'
+```
+
+Expected: Healthy twice. Say: "The API and fake gateway can reach their required configured dependencies. This does not by itself prove that a user can sign in."
+
+### Show 2: sign in, exchange and call the protected endpoint
+
+Paste only the code block, not PowerShell's PS or >> prompt characters. The final closing brace matters. This stops if either login stage fails, so an old session is not accidentally presented as a new success.
+
+```powershell
+$session = $null
+$firebaseLogin = $null
+$loginBody = @{
+    email = $demoEmail
+    password = ([System.Net.NetworkCredential]::new('', $demoPassword)).Password
+    returnSecureToken = $true
+} | ConvertTo-Json
+
+try {
+    $firebaseLogin = Invoke-RestMethod `
+        -Method Post `
+        -Uri "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=$firebaseApiKey" `
+        -ContentType 'application/json' `
+        -Body $loginBody `
+        -ErrorAction Stop
+    Write-Output '1. Firebase sign-in succeeded; ID token kept private.'
+
+    $session = Invoke-RestMethod `
+        -Method Post `
+        -Uri 'http://localhost:8080/auth/firebase' `
+        -ContentType 'application/json' `
+        -Body (@{ idToken = $firebaseLogin.idToken } | ConvertTo-Json) `
+        -ErrorAction Stop
+    Write-Output '2. Local token exchange succeeded; tokens kept private.'
+
+    Invoke-RestMethod `
+        -Uri 'http://localhost:8080/auth/me' `
+        -Headers @{ Authorization = "Bearer $($session.accessToken)" } `
+        -ErrorAction Stop
+}
+finally {
+    Remove-Variable loginBody, demoPassword -ErrorAction SilentlyContinue
+}
+```
+
+Expected final result: a userId and role Customer. Use a dedicated demo account if displaying the identifier. Say: "Firebase checked the login credentials. My API verified the Firebase ID token through Admin SDK, including revocation, then found the user by project and UID. It issued its own ten-minute JWT, which this protected endpoint accepted. A new identity gets Customer only."
+
+If repeating the demonstration, prompt for $demoPassword again; the finally block clears it. A Firebase ID token is not our API JWT. A service-account JSON file is neither of those user tokens.
+
+### Show 3: no credential means no access
+
+```powershell
+try {
+    $null = Invoke-RestMethod 'http://localhost:8080/auth/me' -ErrorAction Stop
+    Write-Output 'Unexpected result: unauthenticated request succeeded.'
+}
+catch {
+    if ($null -ne $_.Exception.Response) {
+        Write-Output "Without a Bearer token: HTTP $([int]$_.Exception.Response.StatusCode)"
+    }
+    else {
+        Write-Output 'Request could not reach the API; this is not an authorization proof.'
+    }
+}
+```
+
+Expected: HTTP 401. Say: "The same endpoint rejects a request without a valid access token." This is a live check to perform; the successful Customer request has already been observed. Role ownership, refresh replay, wrong-project/expired/revoked tokens and same-email identity separation have separate automated tests; this short login demo does not re-prove all of them.
+
+### Questions to answer after the walkthrough
+
+- Why not send the password to our API? The demo sends it to Firebase; our API accepts a Firebase ID token and does not manage the user's Firebase password.
+- Why issue a local JWT? Our API controls its own audience, short lifetime, local roles and rotating session credentials.
+- Why not let the client choose Admin? A client role request is not authority. Privileged roles require the separate verified-UID provisioning command.
+- Does Customer output alone prove no email linking? No; show the project/UID uniqueness and identity-separation test for that stronger claim.
+- Is push working too? This verified authentication only. FCM requires a real registered device and a separate delivery smoke test.
+- Is this deployed publicly? No. Real Firebase is connected to the local Docker API; managed hosting remains separate work.
+
+Finish with: "The real login flow now works, and the failure we found improved our production-default test coverage. I distinguish a successful local login from complete provider and production validation."
+
+## Copy-and-paste booking and checkout demo
+
+You can copy prepared commands into PowerShell during the interview. You do not need to memorise the syntax or build a frontend. Keep this guide open, paste one block at a time, explain the result, then continue. Do not paste PS or >> prompt text from a terminal transcript. Preparing a script is fine; understanding the operation and its failure behavior is what matters.
+
+Prerequisites: local services running and $session from the Firebase walkthrough still valid. Access tokens last ten minutes; reauthenticate or use the documented refresh flow if needed. These blocks create real local demo records. Use a future service date when presenting; the example date is not a permanent business default.
+
+### Block A: create a booking
+
+```powershell
+$booking = Invoke-RestMethod `
+    -Method Post `
+    -Uri 'http://localhost:8080/bookings' `
+    -Headers @{ Authorization = "Bearer $($session.accessToken)" } `
+    -ContentType 'application/json' `
+    -Body (@{ serviceDate = '2030-01-01'; voucherCode = $null } | ConvertTo-Json) `
+    -ErrorAction Stop
+
+$booking | Select-Object id, state, totalMinor, currency
+```
+
+Say: "I send the service date, not an amount. The server calculates the price and creates a Draft booking. State 0 means Draft; this API currently serializes enums as numbers. With the current default configuration, 10,000 halalas is SAR 100."
+
+Observed by the user: Draft state 0, totalMinor 10000, currency SAR. The price can change with trusted configuration or vouchers; do not describe the example amount as hardcoded client input. Creating another booking is a new operation, not an idempotency proof.
+
+### Block B: create a checkout
+
+```powershell
+# Generate once for this logical checkout; keep the key for retries.
+$checkoutKey = [Guid]::NewGuid().ToString('N')
+
+$checkout = Invoke-RestMethod `
+    -Method Post `
+    -Uri "http://localhost:8080/bookings/$($booking.id)/checkout" `
+    -Headers @{ Authorization = "Bearer $($session.accessToken)" } `
+    -ContentType 'application/json' `
+    -Body (@{ requestKey = $checkoutKey } | ConvertTo-Json) `
+    -ErrorAction Stop
+
+$checkout | Select-Object id, checkoutId
+```
+
+Say: "The payment attempt is saved before calling the separate gateway. This response contains the local attempt ID and the provider checkout ID. Creating a checkout does not mean money was captured."
+
+Observed by the user: a local attempt ID and a gateway checkout ID were returned. Neither proves successful payment. Select-Object only displays named properties; a blank selected status field alone is not evidence of a payment error.
+
+### Block C: retry and compare
+
+```powershell
+$retry = Invoke-RestMethod `
+    -Method Post `
+    -Uri "http://localhost:8080/bookings/$($booking.id)/checkout" `
+    -Headers @{ Authorization = "Bearer $($session.accessToken)" } `
+    -ContentType 'application/json' `
+    -Body (@{ requestKey = $checkoutKey } | ConvertTo-Json) `
+    -ErrorAction Stop
+
+[PSCustomObject]@{
+    SameAttempt = ($retry.id -eq $checkout.id)
+    SameGatewayCheckout = ($retry.checkoutId -eq $checkout.checkoutId)
+}
+```
+
+Expected: both True. This repeat-checkout command is prepared for the user to run; the live comparison has not yet been observed. Say: "A repeated request recovers the same attempt and checkout. This shows a simple retry; the automated concurrent-request and response-loss tests prove the harder cases."
+
+### Block D: inspect the booking
+
+```powershell
+Invoke-RestMethod `
+    -Uri "http://localhost:8080/bookings/$($booking.id)" `
+    -Headers @{ Authorization = "Bearer $($session.accessToken)" } `
+    -ErrorAction Stop |
+    Select-Object id, state, totalMinor, currency, version
+```
+
+Before simulated payment, expect PendingPayment (state 1). Paid is state 2; Offered is state 3 and can follow asynchronously if an eligible performer exists. Do not call a checkout ID proof of Paid. The next live step is operator-authenticated fake-gateway payment and verification of the resulting booking state; it has not yet been observed for this booking.
+
+Presentation rhythm: paste -> show the small response -> explain one guarantee -> name the corresponding failure test. Keep token variables, service-account JSON and environment secrets off screen. A five-minute demo should show the normal flow and one retry, then one focused concurrency test rather than every test or command in the repository.
+
+## Live Azure, push and email setup: next demo milestone
+
+Requested next: actual private cloud upload/read and actual notification receipt. These remain pending until provider setup and receipt are observed; existing local tests are not live-delivery evidence.
+
+User decision: keep Azurite for the storage demonstration and defer live Azure. Focus on real email/FCM next. Follow [NOTIFICATION_DEMO.md](NOTIFICATION_DEMO.md) for the step-by-step Resend setup, local browser receiver, device registration and outbox-driven payment trigger. Preparation is implemented and locally checked, but real channel receipt has not yet been observed.
+
+- Azure needs an existing subscription or suitable free credits. Do not create paid resources as an assumed extension of the no-paid-hosting constraint. For this adapter use a private Blob container, HTTPS and an account-key connection string supplied through Storage configuration. Anonymous blob access must remain disabled. Verify an upload through the API-issued exact-path link, mark it complete, obtain an owner-checked read link and demonstrate unsigned access denial using synthetic content, never a real passport.
+- Email uses Resend. Without a verified custom domain, its test sender can deliver only to the email address associated with the Resend account. This is enough for a personal delivery demo; arbitrary recipients require a verified sender domain. Configure the provider key privately, plus the trusted local user-ID/recipient mapping. Use a real booking event so email leaves through the outbox, not a request-time direct-send shortcut.
+- Push uses the existing Firebase project but requires a real recipient registration. A browser demo needs a local receiver/service worker, notification permission and the Firebase Web Push public VAPID key. A Firebase user ID token is not a device registration token. Register the recipient with authenticated /notifications/device, then verify receipt from an outbox-driven booking event. FCM console-only sends would test Firebase reachability but would not prove our outbox adapter.
+
+Useful references: [Azure storage creation](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-create), [Firebase web push setup](https://firebase.google.com/docs/cloud-messaging/web/get-started), [Resend testing-domain restriction](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain). Provider credentials, signed blob URLs and device registration tokens must not be pasted into chat or saved in this guide.
