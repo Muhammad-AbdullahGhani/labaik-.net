@@ -17,6 +17,8 @@ public static class PaymentHosting
         services.AddSingleton(new BookingPolicy { BaseMinor = config.GetValue("Booking:BaseMinor", 10000L), DailyLimit = config.GetValue("Booking:DailyLimit", 50),
             DateAddons = (config.GetSection("Booking:DateAddons").Get<Dictionary<string,long>>() ?? new()).ToDictionary(x => DateOnly.ParseExact(x.Key, "yyyy-MM-dd"), x => x.Value) });
         services.AddScoped<AssignmentService>(); services.AddScoped<PrivateFileService>();
+        services.AddSingleton(new PayoutPolicy { PerformerFeeMinor = config.GetValue("Payouts:PerformerFeeMinor", 7000L), Accounts = config.GetSection("Payouts:Accounts").Get<Dictionary<string,string>>() ?? new() });
+        services.AddScoped<CompletionService>(); services.AddScoped<PayoutService>();
         services.AddSingleton<IPrivateBlobStore>(_ => new AzurePrivateBlobStore(config["Storage:ConnectionString"] ?? throw new FileStoreUnavailableException(), config["Storage:Container"] ?? "private-evidence"));
         services.AddScoped<BookingMoney>(); services.AddScoped<BookingService>();
         services.AddSingleton(_ =>

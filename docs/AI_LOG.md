@@ -119,3 +119,8 @@ User approved the proposed two-hour timebox through steps 4-7, focused tests per
 Prompt: finish the remaining core steps in two hours, maintain easy demo wording and use focused tests before one final regression.
 Proposed/accepted: ordinary row mutex for round-robin and deadline decisions; Azure private blobs with create-only grants; no upload UI or transcoding. Implemented assignment, suspension, file authorization and approval.
 Validation: AssignmentTests 3 passed; PrivateFileTests 1 passed (real PostgreSQL and Azurite). Initial Azurite 3.35 pull failed; switched to available 3.37.0 and reran successfully. Cloud Azure remains unverified.
+
+## Entry 010 — Step 6
+Prompt/decision: continue the approved lean timebox; prioritize payout double-run before polish.
+Implemented completion guards, single earning, weekly claims, terminal bank outcomes, retry after confirmed failure and deterministic CSV. Chose one short existing database mutex for explainable cross-workflow lock order; no advisory locks or new scheduling framework. Unknown bank status cannot release claims.
+Validation: Release build succeeded, 0 warnings/errors; PayoutTests 6 passed, 0 failed/skipped (5 s), real PostgreSQL. No real bank transfer was attempted. Generated migration using a design-only connection; no production migration ran.

@@ -25,6 +25,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<PerformerOffer> PerformerOffers => Set<PerformerOffer>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<JobRun> JobRuns => Set<JobRun>();
+    public DbSet<Earning> Earnings => Set<Earning>();
+    public DbSet<PayoutBatch> PayoutBatches => Set<PayoutBatch>();
+    public DbSet<PayoutItem> PayoutItems => Set<PayoutItem>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("app");
@@ -32,6 +35,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         AuthModel.Configure(modelBuilder);
         PaymentModel.Configure(modelBuilder);
         OperationsModel.Configure(modelBuilder);
+        PayoutModel.Configure(modelBuilder);
     }
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

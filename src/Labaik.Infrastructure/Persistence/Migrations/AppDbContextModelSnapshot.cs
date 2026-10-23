@@ -400,6 +400,156 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.Earning", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("PerformerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id")
+                        .HasName("PK_Earnings");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Earnings_Booking");
+
+                    b.HasIndex("PerformerId", "Status", "CompletedAt")
+                        .HasDatabaseName("IX_Earnings_Pool");
+
+                    b.ToTable("Earnings", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_Earnings_Money", "\"AmountMinor\">0 AND \"Currency\"='SAR'");
+
+                            t.HasCheckConstraint("CK_Earnings_Status", "\"Status\" IN ('Available','Reserved','Paid')");
+                        });
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.PayoutBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BankReference")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DestinationIban")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("ExportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PerformerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("TotalMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateOnly>("WeekStart")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id")
+                        .HasName("PK_PayoutBatches");
+
+                    b.HasIndex("BankReference")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Batches_BankReference")
+                        .HasFilter("\"BankReference\" IS NOT NULL");
+
+                    b.HasIndex("PerformerId");
+
+                    b.HasIndex("RequestKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Batches_RequestKey");
+
+                    b.HasIndex("WeekStart", "PerformerId")
+                        .HasDatabaseName("IX_Batches_Week");
+
+                    b.ToTable("PayoutBatches", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_Batches_Money", "\"TotalMinor\">0 AND \"Currency\"='SAR'");
+
+                            t.HasCheckConstraint("CK_Batches_Reference", "\"Status\"='Pending' OR \"BankReference\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_Batches_Status", "\"Status\" IN ('Pending','Paid','Failed')");
+                        });
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.PayoutItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("EarningId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id")
+                        .HasName("PK_PayoutItems");
+
+                    b.HasIndex("EarningId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Items_ClaimedEarning")
+                        .HasFilter("\"Status\" IN ('Pending','Paid')");
+
+                    b.HasIndex("BatchId", "EarningId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Items_BatchEarning");
+
+                    b.ToTable("PayoutItems", "app", t =>
+                        {
+                            t.HasCheckConstraint("CK_Items_Money", "\"AmountMinor\">0 AND \"Currency\"='SAR'");
+
+                            t.HasCheckConstraint("CK_Items_Status", "\"Status\" IN ('Pending','Paid','Failed')");
+                        });
+                });
+
             modelBuilder.Entity("Labaik.Infrastructure.Operations.PerformerOffer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -891,6 +1041,50 @@ namespace Labaik.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("Id", "FamilyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("FK_RefreshTokens_ParentFamily");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.Earning", b =>
+                {
+                    b.HasOne("Labaik.Domain.Bookings.Booking", null)
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Earnings_Booking");
+
+                    b.HasOne("Labaik.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("PerformerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Earnings_Performer");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.PayoutBatch", b =>
+                {
+                    b.HasOne("Labaik.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("PerformerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Batches_Performer");
+                });
+
+            modelBuilder.Entity("Labaik.Infrastructure.Operations.PayoutItem", b =>
+                {
+                    b.HasOne("Labaik.Infrastructure.Operations.PayoutBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Items_Batch");
+
+                    b.HasOne("Labaik.Infrastructure.Operations.Earning", null)
+                        .WithMany()
+                        .HasForeignKey("EarningId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("FK_Items_Earning");
                 });
 
             modelBuilder.Entity("Labaik.Infrastructure.Operations.PerformerOffer", b =>

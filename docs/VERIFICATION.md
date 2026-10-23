@@ -85,3 +85,6 @@ Focused `CapacityRefundTests`: 5 passed, 0 failed/skipped (21 s reported test du
 
 ## Step 5
 Release focused results: AssignmentTests 3 passed, 0 failed, 0 skipped (4 s). PrivateFileTests 1 passed, 0 failed, 0 skipped (7 s). Testcontainers used PostgreSQL 17 and Azurite 3.37.0. The initial missing Azurite image failed; the corrected pinned image passed. No live Azure deployment was tested.
+
+## Step 6
+Release build: succeeded, 0 warnings, 0 errors. PayoutTests: 6 passed, 0 failed, 0 skipped (5 s). Covers 20 concurrent same/different-key batch requests, proof/role guards, repeat export, failed-claim recovery, terminal result race and dispute exclusion. Bank execution/format acceptance is not verified.
