@@ -1,6 +1,8 @@
 # Demo preparation - plain-language notes
 
-For the easiest current presentation, use the [guided frontend walkthrough](FRONTEND_DEMO.md). It replaces most PowerShell commands with login, booking, checkout, simulation, status and push-registration controls. The older command blocks remain useful for explaining/testing the API. Email configuration is user-observed successful; actual email/push receipt is still pending.
+For the easiest current presentation, use the [guided frontend walkthrough](FRONTEND_DEMO.md). It replaces most PowerShell commands with login, booking, checkout, simulation, status and push-registration controls. The older command blocks remain useful for explaining/testing the API. User-observed live results now include Firebase login, browser push registration and an actual Resend payment-confirmation email in the inbox. Actual push-message receipt has not yet been reported.
+
+For assignment-wide coverage, use [DEMO_COVERAGE.md](DEMO_COVERAGE.md). It maps each feature to exact UI clicks, focused tests and code/assertions to explain. The current frontend does not include performer/proof/completion/payout action screens; show those backend guarantees through their integration tests rather than implying they are already clickable.
 
 Keep this beside the code. Steps 4-6 are committed and lean step 7 has passed its final local regression: 823 tests passed, none failed or skipped. Public mutations require authentication; callbacks require valid cryptography. See VERIFICATION.md for exact evidence and external limits.
 
@@ -600,6 +602,21 @@ Presentation rhythm: paste -> show the small response -> explain one guarantee -
 Requested next: actual private cloud upload/read and actual notification receipt. These remain pending until provider setup and receipt are observed; existing local tests are not live-delivery evidence.
 
 User decision: keep Azurite for the storage demonstration and defer live Azure. Focus on real email/FCM next. Follow [NOTIFICATION_DEMO.md](NOTIFICATION_DEMO.md) for the step-by-step Resend setup, local browser receiver, device registration and outbox-driven payment trigger. Preparation is implemented and locally checked, but real channel receipt has not yet been observed.
+
+Later user-observed evidence: the guided frontend started healthy, Enable browser push reported Registered, and a payment-confirmation email arrived from the Resend onboarding sender after the payment demonstration. This confirms real email receipt through the booking/outbox path. Push registration is confirmed; actual push receipt remains unreported. Earlier pending-delivery paragraphs describe the setup stage.
+
+## Current demonstration: what to show and say
+
+1. Sign in on /demo/. Say: "Firebase verifies identity; my API issues its own short-lived session and controls local permissions. New users get Customer."
+2. Enable push before paying. Say: "The browser registers a delivery token. Registered is not the same as receiving a message."
+3. Create a future-date booking. Say: "The server calculates the SAR price; the browser does not send an amount."
+4. Create checkout and click Retry checkout once. Say: "Retries use the same logical attempt. The database and provider both enforce idempotency."
+5. Simulate successful payment. Say: "This is a fake gateway; no real money moves. The worker re-queries it and checks amount, currency and reference before applying capture and capacity."
+6. Show the resulting booking state, then show the actual payment-confirmation email. Say: "The paid decision and outgoing work commit together. Email is delivered later by a background worker." Do not expose token variables, provider keys or unrelated inbox content.
+7. If a push message appears, show it. Otherwise say: "Registration worked; live push delivery is still being investigated." Do not present the Registered label as delivery proof.
+8. Run one focused concurrency test or show its saved assertions/results. Explain 200 payments for 50 slots, accept versus expiry, or payout double-run. The UI walkthrough does not replace those failure proofs.
+
+Implemented backend capabilities include guarded booking states/versioning, integer pricing/vouchers, Firebase/local sessions with refresh replay protection, idempotent simulated payments, encrypted/deduplicated callbacks, verified capture, capacity/full refunds, assignment/deadlines, proof/completion, payout claims/CSV, private storage adapter, localized notification outbox, recovery/reconciliation and operational checks. Some capabilities have automated local evidence only: do not claim live Azure, real bank execution, public deployment or completed performer/file/payout UI flows. The frontend currently focuses on booking/payment/notifications and privileged read-only operations.
 
 - Azure needs an existing subscription or suitable free credits. Do not create paid resources as an assumed extension of the no-paid-hosting constraint. For this adapter use a private Blob container, HTTPS and an account-key connection string supplied through Storage configuration. Anonymous blob access must remain disabled. Verify an upload through the API-issued exact-path link, mark it complete, obtain an owner-checked read link and demonstrate unsigned access denial using synthetic content, never a real passport.
 - Email uses Resend. Without a verified custom domain, its test sender can deliver only to the email address associated with the Resend account. This is enough for a personal delivery demo; arbitrary recipients require a verified sender domain. Configure the provider key privately, plus the trusted local user-ID/recipient mapping. Use a real booking event so email leaves through the outbox, not a request-time direct-send shortcut.

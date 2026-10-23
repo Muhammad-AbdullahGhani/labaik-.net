@@ -1,6 +1,8 @@
 # Guided local demo workspace
 
-The frontend replaces repeated PowerShell requests with one guided page. It uses the real API for login, server-priced bookings, idempotent checkout, simulation submission and verified status. Email and push still come from the existing outbox. Local browser tests use synthetic responses; a real frontend login/payment/channel receipt still needs your manual walkthrough.
+The frontend replaces repeated PowerShell requests with one guided page. It uses the real API for login, server-priced bookings, idempotent checkout, simulation submission and verified status. Email and push still come from the existing outbox. Automated browser tests use synthetic responses; actual provider evidence comes separately from the user's live walkthrough below.
+
+Live follow-up: the user started the real frontend, successfully registered browser push and received the payment-confirmation email from the Resend onboarding sender. Real email receipt is now user-verified. Actual push receipt remains unreported; earlier pending-walkthrough wording describes preparation. No public deployment or real payment is implied.
 
 ## Start it
 

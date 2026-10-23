@@ -1,8 +1,8 @@
 # Real email and browser push demo
 
-Status: preparation and local checks only. Real Resend email receipt and FCM browser receipt must be observed before calling live delivery verified. Storage stays on the existing Azurite-tested path; no Azure trial is needed for this notification demo.
+Status: the user has now observed an actual Resend payment-confirmation email after the guided payment flow. Browser FCM registration also succeeded; actual browser push receipt has not yet been reported. These are user-observed results, not an independently repeated provider send by the agent. Storage stays on the existing Azurite-tested path; no Azure trial is needed for this notification demo.
 
-User-observed update: the email setup helper completed and the API restarted healthy with the authenticated recipient mapping. No email receipt has been observed yet. A [guided frontend](FRONTEND_DEMO.md) now provides login, booking, checkout, simulation, status and direct authenticated push registration; prefer it for the interview. The separate loopback receiver and PowerShell steps below remain available as focused troubleshooting tools.
+User-observed update: the email setup helper completed, the API restarted healthy with the authenticated recipient mapping, and an actual confirmation email subsequently arrived. A [guided frontend](FRONTEND_DEMO.md) provides login, booking, checkout, simulation, status and direct authenticated push registration; prefer it for the interview. The separate loopback receiver and PowerShell steps below remain available as focused troubleshooting tools.
 
 ## 1. Resend setup
 
