@@ -3,10 +3,11 @@ using FirebaseAdmin.Auth;
 using Google.Apis.Auth.OAuth2;
 using Labaik.Application.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Labaik.Infrastructure.Identity;
 
-public sealed class FirebaseTokenVerifier(IConfiguration config, Google.Apis.Http.HttpClientFactory? httpClientFactory = null) : IFirebaseTokenVerifier, IDisposable
+public sealed class FirebaseTokenVerifier(IConfiguration config, Google.Apis.Http.HttpClientFactory? httpClientFactory = null, ILogger<FirebaseTokenVerifier>? logger = null) : IFirebaseTokenVerifier, IDisposable
 {
     private readonly Lazy<FirebaseApp> _app = new(() =>
     {
@@ -16,14 +17,23 @@ public sealed class FirebaseTokenVerifier(IConfiguration config, Google.Apis.Htt
         var json = config["Firebase:CredentialsJson"];
         if (string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(json)) throw new AuthUnavailableException();
         // Credentials are trusted administrator configuration, never a request-supplied JSON document.
+        var stage = "CredentialLoading";
         try
         {
             var credential = CredentialFactory.FromJson<ServiceAccountCredential>(json).ToGoogleCredential();
             if (httpClientFactory is not null) credential = credential.CreateWithHttpClientFactory(httpClientFactory);
-            return FirebaseApp.Create(new AppOptions { ProjectId = project, Credential = credential, HttpClientFactory = httpClientFactory }, Guid.NewGuid().ToString("N"));
+            stage = "AppCreation";
+            var options = new AppOptions { ProjectId = project, Credential = credential };
+            // Keep the SDK's default factory in production. Its setter rejects null; tests supply a controlled factory.
+            if (httpClientFactory is not null) options.HttpClientFactory = httpClientFactory;
+            return FirebaseApp.Create(options, Guid.NewGuid().ToString("N"));
         }
         catch (Exception error) when (error is ArgumentException or System.Text.Json.JsonException)
-        { throw new AuthUnavailableException(); }
+        {
+            logger?.LogWarning("Firebase initialization unavailable: {Stage}, {ErrorType}, parameter {Parameter}",
+                stage, error.GetType().Name, (error as ArgumentException)?.ParamName);
+            throw new AuthUnavailableException();
+        }
     });
     public async Task<VerifiedFirebaseIdentity> VerifyAsync(string idToken, CancellationToken cancellationToken = default)
     {
@@ -40,7 +50,13 @@ public sealed class FirebaseTokenVerifier(IConfiguration config, Google.Apis.Htt
             or AuthErrorCode.InvalidIdToken or AuthErrorCode.UserNotFound)
         { throw new InvalidFirebaseTokenException(); }
         catch (ArgumentException) { throw new InvalidFirebaseTokenException(); }
-        catch (FirebaseException) { throw new AuthUnavailableException(); }
+        catch (FirebaseException error)
+        {
+            // Log only SDK error enums, never the exception message, user identity, token or provider response.
+            logger?.LogWarning("Firebase verification unavailable: {ErrorCode}, {AuthErrorCode}",
+                error.ErrorCode, (error as FirebaseAuthException)?.AuthErrorCode);
+            throw new AuthUnavailableException();
+        }
     }
     public void Dispose() { if (_app.IsValueCreated) _app.Value.Delete(); }
 }

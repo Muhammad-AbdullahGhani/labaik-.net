@@ -78,7 +78,7 @@ Keep this beside the code. Steps 4-6 are committed and lean step 7 has passed it
 
 ## Commands and evidence
 
-See VERIFICATION.md for observed commands/results, DESIGN.md for decisions, and AI_LOG.md for AI assistance. The step-3 targeted command and final counts will be added after the new suites run. Use test-generated data; never display environment files, service-account JSON, API keys or tokens during the demo.
+See VERIFICATION.md for observed commands/results, DESIGN.md for decisions, and AI_LOG.md for AI assistance. Use test-generated data; never display environment files, service-account JSON, API keys or tokens during the demo. The interview practice section below gives likely questions and follow-ups.
 
 ## Step 3 problems I can explain
 
@@ -143,7 +143,7 @@ Tests create an isolated PostgreSQL container with generated data and remove it 
 
 **What if the callback arrives twice with different event IDs?** "Inbox uniqueness catches exact event repeats. Capture and outbox uniqueness plus the booking transaction also catch repeated success under a different event ID."
 
-**What if a paid booking was cancelled?** "I retain the capture and the cancellation, and record refund and accountant-alert intents. Actual automatic refunds are step 4; I have not pretended those intents already returned money."
+**What if a paid booking was cancelled?** "I retain the capture and cancellation, and create durable refund work and an accountant alert. The refund worker reuses one provider key until a confirmed result is recorded. Requested is not the same as refunded."
 
 **What if the worker dies after sending?** "The receiver might see the same message again. I send the same message ID every time so a durable receiver can recognise the duplicate. The test receiver stores one receipt even when it receives two deliveries."
 
@@ -193,3 +193,217 @@ Exact final test wording: ?The full Release run passed 823 tests. I then changed
 
 
 Final local stack proof: both services answered live/ready with 200 and ran as non-root; the migration upgrade succeeded against the retained database. I stopped the stack cleanly afterward. Restart it with docker compose up --build --wait for the demo; use the focused test commands if live Firebase credentials are unavailable.
+
+## Interview practice: what to learn first
+
+These are likely questions, not a prediction of the interview. Practise answering without reading. For each answer, give the problem, the mechanism, the test and one limitation. Start with questions 1-12; then cover identity and the .NET details.
+
+### 1. What problem does this project solve?
+
+Say: "It manages bookings, payment confirmation, performer work and payout records for an Umrah-by-proxy service. The hard part is keeping money and booking state correct when requests overlap or a service fails. I prioritised those failure cases before optional UI."
+
+Follow-up: **What is your most important guarantee?** A timeout cannot by itself open another charge attempt, and verified captures cannot allocate more than the date limit. External charge protection also depends on the gateway honoring persistent idempotency.
+
+### 2. What is idempotency? Is it just rejecting duplicates?
+
+Say: "Repeating the same operation has the same business effect. If a checkout response is lost, the retry recovers the existing attempt instead of creating another charge. The same key with changed input conflicts."
+
+Follow-up: **What if the customer uses a different key?** The booking still has only one unresolved or successful payment attempt, protected by locking and a partial unique index. A new client key does not bypass that booking rule. Open PaymentCheckout.cs and PaymentModel.cs.
+
+### 3. What happens if the gateway charges and your API crashes?
+
+Say: "We already saved the attempt and gateway key before calling it. After restart, recovery queries or retries that same operation. It never assumes that a lost response means no money moved."
+
+Follow-up: **Can you promise exactly one real charge?** Only with the provider's persistent idempotency contract. A unique local capture row stops double credit locally; it cannot undo an unrelated external charge. Demonstrate the response-loss/restart tests, and say that these are deterministic failure simulations rather than literal OS process kills.
+
+### 4. How do 200 requests avoid taking more than 50 places?
+
+Say: "Each verified capture tries one conditional database update: increment the date counter only when allocated is below the limit. That update and the booking allocation commit together. A full date keeps the capture record and creates refund work instead of accepting the booking."
+
+Follow-up: **Why not read the count and then add one?** Two requests could both read 49 and both decide a slot is free. The conditional update makes the decision and write one database operation. A CHECK constraint also rejects out-of-range counters. Show BookingMoney.cs and CapacityRefundTests.
+
+### 5. What is a race condition? Why not use lock in C#?
+
+Say: "A race happens when the result depends on overlapping operations. A C# lock protects only one process, while two API instances can both write to PostgreSQL. Database row locks, conditional updates and constraints coordinate those instances."
+
+Follow-up: **Does locking everything solve it?** It can destroy throughput and create deadlocks. Keep locks short, take them in a consistent order and keep network calls outside the transaction. Our shared assignment/payout mutex is deliberately conservative for this small system, and is a scaling trade-off.
+
+### 6. What is a transaction? Explain ACID in this project.
+
+Say: "A transaction makes a group of database changes commit together or roll back together. For payment confirmation, capture, booking state, capacity, voucher use and outbox intent belong together. Otherwise we could have a paid booking without its follow-up work."
+
+- Atomicity: all those writes commit or none do.
+- Consistency: valid writes preserve rules such as nonnegative money and bounded capacity.
+- Isolation: overlapping transactions interact according to PostgreSQL's isolation and locking rules; isolation does not mean every transaction is automatically serializable.
+- Durability: committed data survives an application restart, subject to the database's durability configuration and storage guarantees.
+
+Follow-up: **Does this include the gateway HTTP call?** No. It is a separate service with its own transaction. Persisted intent, stable keys and recovery bridge the two systems. Show the test that deliberately fails the outbox insert and checks rollback.
+
+### 7. Optimistic concurrency versus row locking: why use both?
+
+Say: "A version check rejects a booking update based on an old version. A row lock makes competing transactions wait while a short decision is made. We use versions for stale booking writes and locks when a decision involves related rows."
+
+Follow-up: **Does EF add this automatically?** We configure Version as a concurrency token and increment it on tracked booking updates. EF includes the original version in the UPDATE predicate; no matching row raises a concurrency exception. Raw SQL booking updates must handle version checks/increments explicitly. Open AppDbContext.cs and the stale-version test.
+
+### 8. Why are both an inbox and an outbox needed?
+
+Say: "The inbox stores incoming gateway events once so processing can resume after a crash. The outbox stores outgoing work with the booking change, so follow-up work is not lost. They protect different sides of the workflow."
+
+Follow-up: **Can a notification repeat?** Yes: sending can succeed before its acknowledgement is saved. We reuse a stable message ID; email provider deduplication helps within its supported contract, while push may repeat. At-least-once processing is not universal exactly-once delivery.
+
+### 9. What if webhooks are duplicated, old or forged?
+
+Say: "We authenticate the raw encrypted body, decrypt it and deduplicate the event. Then we ask the gateway for its current result and check booking reference, amount and currency. We never let an old Pending or Failed observation undo a successful capture."
+
+Follow-up: **What if two different event IDs describe the same payment?** The capture and business-event uniqueness rules still prevent double credit. Inbox deduplication alone would not be enough. A browser redirect only reads status; it cannot mark Paid. Open WebhookCodec.cs and PaymentPump.cs.
+
+### 10. How can accepting an offer and expiring it happen safely together?
+
+Say: "Both paths use the same short database mutex and check the database clock. An offer must still be pending and before its deadline to accept. Active-offer unique indexes also prevent a booking or performer having two active assignments."
+
+Follow-up: **Why database time?** API instances may disagree slightly about the clock. One time source makes the deadline decision consistent. Acceptance is repeatable for the same accepted offer and performer. Show Assignment.cs and the concurrent accept/expiry test.
+
+### 11. How do you prevent paying an earning twice?
+
+Say: "Completion creates one earning per booking. A batch reserves earnings in a transaction, and a partial unique index allows only one Pending or Paid payout item for an earning. Confirmed Failed releases the earning; an unknown bank outcome stays Pending."
+
+Follow-up: **Does exporting the CSV pay the performer?** No. It is an instruction file. An accountant records a confirmed bank result with a unique reference; a repeated export does not change Pending to Paid. This is local payout accounting, not proof of exactly-once real bank execution. Show Payouts.cs, PayoutModel.cs and PayoutTests.
+
+### 12. How do workers recover after a crash? What does SKIP LOCKED mean?
+
+Say: "A worker claims a persisted job with an owner, expiry time and increasing claim version. SKIP LOCKED lets another worker pick different work instead of waiting on a row being claimed. After a crashed worker's lease expires, the job can be claimed again."
+
+Follow-up: **What if the old worker wakes up?** It must match the current owner/version and a valid lease before committing effects. This is fencing. It cannot unsend an external request, so provider idempotency is still needed. Failures back off and eventually become visible dead letters; operators must investigate outcomes before retrying. Open WorkQueue.cs.
+
+### 13. Authentication versus authorization: what is the difference?
+
+Say: "Authentication establishes who you are. Authorization decides whether that identity may perform this action on this booking or file. A valid JWT does not mean you can read someone else's passport."
+
+Follow-up: **Why verify a Firebase token instead of just decoding it?** Decoding only reads claims. The Admin SDK verifies the signature, expected project, expiry and revocation; we also reject an already expired token after verification. Tests use the real SDK with controlled HTTP responses, but a live project exchange still needs configuration.
+
+### 14. Why identify by Firebase project and UID instead of email?
+
+Say: "Email is not our account-linking or role-grant key. Two Firebase UIDs with the same email stay separate local users. A new identity gets Customer only; privileged roles require explicit provisioning of the verified UID."
+
+Follow-up: **What stops someone using an Admin's email?** Matching the email has no effect. The unique identity key is project plus UID, and roles are loaded from the local user. Explain the identity-separation test.
+
+### 15. What is a JWT? Is it encrypted? Why ten minutes?
+
+Say: "Our JWT is a signed, short-lived access credential. Its claims are readable; the signature protects their integrity, not their confidentiality. Ten minutes limits the lifetime of a stolen token, while refresh tokens allow the session to continue."
+
+Follow-up: **Does refresh-family revocation immediately kill access JWTs?** No. Already issued access tokens can remain valid until expiry; some business endpoints also check current database user status/role. Do not claim a universal immediate access-token revocation mechanism. Never put secrets in JWT claims.
+
+### 16. Explain refresh-token rotation and the grace window.
+
+Say: "Each refresh token is consumed once, under a family row lock. The same parent and retry key recover the identical encrypted successor for 15 seconds. A changed key or replay after grace commits family revocation before returning an error."
+
+Follow-up: **Why hashes plus encryption?** Hashes verify random refresh credentials without storing them directly. The short-lived encrypted successor is a deliberate exception for lost-response recovery, using a separate key outside the database. A slow legitimate retry outside grace must sign in again; that is the security/usability trade-off. Open IdentityService.cs and TokenCodec.cs.
+
+### 17. How do rate limits avoid locking out a victim?
+
+Say: "Unverified callers consume an IP budget, not the budget of an email they type. The account budget is selected only after a verified identity or stored refresh credential establishes the account. The counters are shared in PostgreSQL, so another API instance does not reset the limit."
+
+Follow-up: **What changes behind a reverse proxy?** Trusted proxy configuration must be set for the actual host. Blindly trusting X-Forwarded-For would let callers invent IPs; currently the socket address is used, which can share one ingress budget.
+
+### 18. Why integer money? How do discounts round?
+
+Say: "Money uses SAR halalas in a long, with checked arithmetic. Percentage discounts round down to a whole minor unit; fixed discounts cannot exceed the subtotal. The server calculates the quote, and zero-total checkout is rejected in this version."
+
+Example: 1,001 halalas at 10 percent gives a discount of 100 halalas and a total of 901. Follow-up: **Why not decimal?** Decimal can model money, but integer minor units make this single-currency policy and rounding explicit. Binary float/double are unsuitable for exact currency arithmetic here.
+
+### 19. How can a voucher's maximum uses stay correct under concurrency?
+
+Say: "Reservation takes the voucher row lock and counts Reserved and Consumed redemptions globally and per user. Every reservation/release follows that locking protocol. A slow or unknown payment retains its reservation until a definitive outcome, rather than releasing it on timeout."
+
+Follow-up: **Is COUNT by itself safe?** No: without the shared row lock, concurrent requests could both see a free use. Expiry is checked when reserving at checkout; the quoted discount does not give unlimited permission to redeem later. Show the 200-user voucher tests.
+
+### 20. Which database tools protect which rules?
+
+| Tool | Meaning | Example here |
+|---|---|---|
+| Primary key | Identifies one row | Booking ID |
+| Foreign key | Requires a referenced row | Earning must reference a booking |
+| CHECK | Validates values within a row | Allocated cannot exceed Limit |
+| Unique index | Prevents duplicate indexed values | Firebase project/UID; capture per booking |
+| Partial unique index | Uniqueness only for selected rows | One active offer or live payment attempt |
+| Transaction/lock | Coordinates a multi-row decision | Voucher counting and reservation |
+
+Follow-up: **Can a CHECK enforce the whole state machine?** No. A normal CHECK cannot compare the previous row state or coordinate arbitrary other rows. The application state-machine component, guarded writes and concurrency checks enforce supported transitions. Arbitrary direct SQL is outside that supported write path.
+
+### 21. What are deadlocks and isolation levels?
+
+Say: "A deadlock is a cycle: transaction A waits for a lock held by B while B waits for A. Consistent lock order and short transactions reduce that risk. PostgreSQL can abort a deadlocked transaction, so any retry must preserve the original operation keys."
+
+Follow-up: **Why not make everything Serializable?** It can detect more conflicts but requires handling transaction retries, and cannot include a gateway's HTTP transaction. Our default PostgreSQL Read Committed transactions use explicit locks, conditional updates and uniqueness for the specific invariants. Do not claim automatic deadlock retries everywhere.
+
+### 22. How are files private and approved proof protected?
+
+Say: "The container is private. After ownership/role checks, the API grants access to one exact object for five minutes. Upload grants are create-only, without overwrite permission; stored ETag/version identity is checked when reading approved evidence."
+
+Follow-up: **Does a signed upload link enforce file size or prove the content is safe?** No. Completion checks size and content-type metadata; metadata is not malware scanning or full file-content validation. The storage administrator remains trusted. Show the real Azurite path/ownership/overwrite test.
+
+### 23. Why these architecture boundaries and interfaces?
+
+Say: "Domain contains rules without HTTP or database dependencies. Application defines provider contracts. Infrastructure contains EF-backed orchestration, workers and provider adapters; Api handles HTTP and composition. The fake gateway has its own HTTP and database credential boundary."
+
+Follow-up: **Is every use case in Application?** No. This lean version keeps transaction-heavy orchestration in Infrastructure rather than introducing an abstraction for every EF operation. That is an explicit compromise; pure rules stay in Domain and external services have interfaces for controlled tests. No generic repository or mediator was added without a concrete need.
+
+### 24. What .NET concepts might they ask you to explain?
+
+- Dependency injection: the host constructs services and supplies their dependencies; registration does not itself call the provider.
+- Scoped lifetime: usually one service instance per HTTP request or explicitly created worker scope. DbContext must not be shared between concurrent operations.
+- Singleton lifetime: one instance per application container; its mutable shared state would need care. It cannot replace a distributed database guarantee.
+- async/await: lets a thread serve other work while I/O is pending; it does not make the database operation atomic or guarantee parallel execution.
+- CancellationToken: requests cooperative cancellation. Cancelling a local HTTP wait does not prove the remote provider cancelled the charge.
+- AsNoTracking: useful for read-only EF queries; fewer tracked objects. It is not a lock and does not make a read current forever.
+- ExecuteSqlInterpolated: EF parameterizes interpolated values. Do not replace it with string-built SQL containing user input. Fixed FromSqlRaw statements here contain no interpolated user input.
+
+Follow-up: **Why create a scope inside a worker?** A hosted worker lives a long time; each work iteration needs its own short-lived DbContext and scoped services.
+
+### 25. What tests actually prove the design?
+
+Say: "Unit tests prove pure state, role, pricing and voucher rules. Real PostgreSQL tests prove constraints, concurrent claims and rollback behavior. The load tests exercise production HTTP endpoints through TestServer with 200 users, then assert database invariants."
+
+Follow-up: **Why not an in-memory database?** It would not reproduce PostgreSQL row locks, partial indexes or SQL CHECK behavior. **Do 823 passing tests prove production readiness?** No. That full run passed, then 15 affected tests passed after follow-up changes. Live provider acceptance, hosting, bank certification and real-network performance remain separate work. Read assertions and failure boundaries, not just the test count.
+
+### 26. How do you deploy, monitor and recover safely?
+
+Say: "Migrations run as separate tasks with schema-owner credentials. Runtime services have narrower credentials and never migrate implicitly. Readiness checks the database, configured storage and this instance's enabled worker heartbeat; liveness only says the process can respond."
+
+Follow-up: **Can you rewrite an applied migration?** No: preserve it and add a new one. Explain the caught local upgrade failure. **How do mixed worker versions roll out?** Disable old workers, apply additive changes, roll compatible API replicas, then enable new workers; HTTP can retain durable work during the processing pause. A dead letter needs investigation, not a new payment key. Basic traces/logs omit personal data, secrets and signed URLs.
+
+### 27. What would you improve, and how did you use AI?
+
+Say: "I would first verify the real providers, bank format and hosting, then add audited operational procedures, file inspection and stronger large-volume job/report handling. The short global mutex is simple to defend here but would become a bottleneck at higher volume. I cut dashboard/XLSX polish before correctness."
+
+Follow-up: **Did you write everything yourself?** "I used AI for proposals, implementation assistance and test scenarios, and recorded that in AI_LOG.md. I need to explain the invariants and inspect the relevant code myself; a green test or generated answer does not replace that responsibility." Never claim to understand a line you cannot explain. If unsure, say which assumption you would check and how you would test it.
+
+## Rehearsal checklist before Firebase setup
+
+1. Explain idempotency versus a transaction in your own words.
+2. Draw: saved attempt -> gateway call -> verified capture -> atomic booking/outbox commit -> background work.
+3. Explain why timeout means unknown, why a redirect cannot prove payment and why an outbox can deliver twice.
+4. Explain the conditional capacity update and the refund path for the 51st booking.
+5. Explain optimistic version checking versus a row lock, and why a C# lock is insufficient across servers.
+6. Explain accept versus expiry, earning claims and why CSV export is not payment.
+7. Explain Firebase identity versus local authorization, then refresh rotation and its grace trade-off.
+8. Open one test for each claim and point to the final assertions. Finish by naming one honest limitation.
+
+Aim for 20-40 seconds per main answer. Let the interviewer choose the deeper follow-up; do not try to recite this whole document.
+
+## Live Firebase demo: current setup and presentation
+
+We enabled email/password in a real Firebase project, created a demo user, configured a server service-account credential through environment variables and started the local Docker stack. The user's Firebase REST sign-in reached the next step, but the API exchange returned 503. Container configuration inspection found missing local Auth signing/recovery keys; Firebase project/credential JSON were present and consistent. Missing local keys were generated into ignored .env without rotating existing nonempty credentials. The user must recreate the API from the same PowerShell session that holds Firebase environment variables, then retry exchange. A successful real API exchange is not verified yet.
+
+Once login succeeds, show this short sequence without displaying token objects or credentials:
+
+1. Show both services' healthy endpoints; say this proves service readiness, not successful Firebase login by itself.
+2. Sign in to Firebase with the demo account; keep its ID token in a PowerShell variable.
+3. Send that token to POST /auth/firebase; keep the returned local JWT/refresh token in a variable.
+4. Call GET /auth/me with the local JWT. Show only userId and Customer role.
+5. Call /auth/me without a token and show 401.
+6. Explain: Firebase authenticates the identity; our API verifies it and assigns local permissions. Email does not link accounts, new identities cannot request Admin, and staff provisioning verifies the exact UID through a separate operator command.
+
+Failure story: health was green while auth exchange returned 503 because optional local token keys were absent. The API failed closed instead of issuing an insecure session. We inspected configuration presence without printing secrets. Only claim the end-to-end flow works after the authenticated /auth/me call actually succeeds.
+
+Second failure and lesson: after adding local keys, exchange still failed. Safe logs showed that our adapter explicitly set the Firebase SDK HTTP factory to null. Earlier tests injected a fake factory, so they did not exercise production defaults. We preserved the SDK default and added a separate default-path test; all seven Firebase adapter tests passed. Say: "A test double can hide a production initialization bug. I added coverage for both the controlled test transport and the real default configuration path." Live login success still needs the actual /auth/me result.

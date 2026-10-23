@@ -14,6 +14,21 @@ namespace Labaik.IntegrationTests;
 
 public sealed class FirebaseAdapterTests
 {
+    [Fact]
+    public async Task Default_production_HTTP_factory_initializes_and_rejects_a_malformed_token()
+    {
+        using var rsa = RSA.Create(2048);
+        var credentials = JsonSerializer.Serialize(new
+        {
+            type = "service_account", project_id = "test-project", private_key_id = "local-test",
+            private_key = rsa.ExportPkcs8PrivateKeyPem(), client_email = "local@test-project.iam.gserviceaccount.com",
+            token_uri = "https://oauth2.googleapis.com/token"
+        });
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["Firebase:ProjectId"] = "test-project", ["Firebase:CredentialsJson"] = credentials }).Build();
+        using var verifier = new FirebaseTokenVerifier(config);
+        await Assert.ThrowsAsync<InvalidFirebaseTokenException>(() => verifier.VerifyAsync("malformed-token"));
+    }
     [Theory]
     [InlineData("valid")]
     [InlineData("wrong-project")]

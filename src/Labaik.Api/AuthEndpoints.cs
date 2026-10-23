@@ -66,6 +66,12 @@ internal static class AuthEndpoints
             };
         }
         catch (Exception error) when (error is AuthUnavailableException or NpgsqlException or TimeoutException)
-        { return Results.StatusCode(503); }
+        {
+            // Authentication must fail closed; expose only diagnostic categories in logs, never credentials.
+            context.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Labaik.Auth")
+                .LogWarning("Authentication unavailable: {ErrorType}, SQL state {SqlState}, origin {Origin}", error.GetType().Name,
+                    (error as PostgresException)?.SqlState, error.TargetSite?.DeclaringType?.FullName);
+            return Results.StatusCode(503);
+        }
     }
 }

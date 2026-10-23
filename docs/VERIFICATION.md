@@ -148,3 +148,9 @@ exit 0; services stopped/removed, network removed; database volume retained
 ```
 
 No production database was contacted. The successful upgrade used the existing local volume and real schema-owner/runtime separation. This is a local deployment check; cloud integrations and managed hosting remain unverified. The final source is covered by the explicit build and focused 15-test follow-up, while the recorded full 823-test run predates the two follow-up tests/fixes. CI will run the complete current suite after push.
+
+## Live Firebase setup follow-up
+
+After correcting missing local auth keys, live exchange still returned 503. Safe diagnostics identified AppCreation/ArgumentNullException for the explicitly null HttpClientFactory. The production adapter now preserves the SDK default. `dotnet test tests/Labaik.IntegrationTests --configuration Release --filter FullyQualifiedName~FirebaseAdapterTests` passed 7 tests, zero failed/skipped (2 s). The first attempted FirebaseAdmin filter matched no tests and is not counted as validation. Explicit Release build succeeded with zero warnings/errors (7.97 s). The full regression was not rerun. User credentials/tokens were not displayed. Successful user-token exchange is still pending.
+
+Rebuilt/recreated API with the existing Firebase environment preserved: Compose exited 0, readiness returned Healthy, and a deliberately invalid token now returned the expected 401 instead of 503. This confirms initialization and malformed-token rejection in the actual container; it does not prove a successful real user-token exchange.
